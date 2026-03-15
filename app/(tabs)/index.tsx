@@ -1,29 +1,28 @@
 // app/(tabs)/index.tsx
-
 import React, { useMemo } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
-
-import { useEstoque } from '../context/estoqueStorage';
-import { useTheme } from '../context/ThemeContext';
-import { BarChart } from "react-native-chart-kit";
-import { Dimensions } from "react-native";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Dimensions } from "react-native";
+import { BarChart } from "react-native-chart-kit";
+import { useEstoque } from '../../context/estoqueStorage';
+import { useTheme } from '../../context/ThemeContext';
+import { GraficoCategorias } from '../../components/GraficoCategorias';
+import { useAlertasEstoque } from '../../hooks/useAlertasEstoque';
 
 const screenWidth = Dimensions.get("window").width;
 
 export default function Dashboard() {
-
   const { colors } = useTheme();
   const { produtos, movimentacoes } = useEstoque();
+  const { totalAlertas, totalVencidos } = useAlertasEstoque();
 
   const dados = useMemo(() => {
-
     const hoje = new Date();
 
     const dataAtual = format(
@@ -37,10 +36,6 @@ export default function Dashboard() {
       dataAtual.slice(1);
 
     const totalProdutos = produtos.length;
-
-    const itensBaixos = produtos.filter(
-      p => p.quantidade <= p.minimo
-    ).length;
 
     const ultimaMov =
       movimentacoes.length > 0
@@ -63,7 +58,6 @@ export default function Dashboard() {
     const consumoPorProduto: Record<string, number> = {};
 
     movimentacoesMes.forEach(mov => {
-
       const produto = produtos.find(
         p => p.id === mov.produtoId
       );
@@ -74,7 +68,7 @@ export default function Dashboard() {
         consumoPorProduto[produto.nome] = 0;
       }
 
-      consumoPorProduto[produto.nome] += mov.quantidade;
+      consumoPorProduto[produto.nome] += mov.quantidadeUnidades || 0;
     });
 
     const totalConsumo = Object.values(
@@ -97,10 +91,6 @@ export default function Dashboard() {
       .sort((a, b) => b.quantidade - a.quantidade)
       .slice(0, 4);
 
-    const estoqueBaixo = produtos
-      .filter(p => p.quantidade <= p.minimo)
-      .slice(0, 3);
-
     const hojeStr = format(hoje, 'yyyy-MM-dd');
 
     const movHoje = movimentacoes.filter(m =>
@@ -109,18 +99,16 @@ export default function Dashboard() {
 
     const entradasHoje = movHoje
       .filter(m => m.tipo === 'retorno')
-      .reduce((acc, m) => acc + m.quantidade, 0);
+      .reduce((acc, m) => acc + (m.quantidadeUnidades || 0), 0);
 
     const saidasHoje = movHoje
       .filter(m => m.tipo === 'retirada')
-      .reduce((acc, m) => acc + m.quantidade, 0);
+      .reduce((acc, m) => acc + (m.quantidadeUnidades || 0), 0);
 
     return {
       saudacao: `Olá, Gabriel!`,
       data: dataFormatada,
       totalProdutos,
-      itensBaixos,
-
       ultimaMovimentacao: ultimaMov
         ? {
             hora: format(
@@ -131,56 +119,44 @@ export default function Dashboard() {
               produtos.find(
                 p => p.id === ultimaMov.produtoId
               )?.nome || '',
-            quantidade: ultimaMov.quantidade,
+            quantidade: ultimaMov.quantidadeUnidades || 0,
           }
         : null,
-
       topProdutos,
-
-      estoqueBaixo,
-
       atividadeHoje: {
         entradas: entradasHoje,
         saidas: saidasHoje,
       },
     };
-
   }, [produtos, movimentacoes]);
 
   const styles = StyleSheet.create({
-
     container: {
       flex: 1,
       backgroundColor: colors.background,
     },
-
     scrollContent: {
       padding: 20,
     },
-
     header: {
       marginBottom: 25,
     },
-
     saudacao: {
       fontSize: 24,
       fontWeight: 'bold',
       color: colors.title,
     },
-
     data: {
       fontSize: 15,
       color: colors.subtitle,
       marginTop: 4,
     },
-
     cardsContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       justifyContent: 'space-between',
       marginBottom: 25,
     },
-
     card: {
       width: '48%',
       backgroundColor: colors.card,
@@ -194,30 +170,25 @@ export default function Dashboard() {
       shadowRadius: 8,
       elevation: 2,
     },
-
     cardIcon: {
       fontSize: 22,
       marginBottom: 8,
     },
-
     cardValor: {
       fontSize: 26,
       fontWeight: 'bold',
       color: colors.title,
     },
-
     cardLabel: {
       fontSize: 14,
       color: colors.subtitle,
     },
-
     secaoTitulo: {
       fontSize: 18,
       fontWeight: '600',
       color: colors.title,
       marginBottom: 12,
     },
-
     grafico: {
       backgroundColor: colors.card,
       borderRadius: 16,
@@ -226,78 +197,25 @@ export default function Dashboard() {
       borderWidth: 1,
       borderColor: colors.border,
     },
-
-    barraItem: {
+    alertaCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 10,
-    },
-
-    barraLabel: {
-      width: 70,
-      fontSize: 14,
-      color: colors.text,
-    },
-
-    barraFundo: {
-      flex: 1,
-      height: 12,
-      backgroundColor: colors.border,
-      borderRadius: 6,
-      marginHorizontal: 8,
-      overflow: 'hidden',
-    },
-
-    barra: {
-      height: '100%',
-      backgroundColor: '#d4a373',
-    },
-
-    barraPercentual: {
-      width: 40,
-      fontWeight: '600',
-      color: colors.title,
-      textAlign: 'right',
-    },
-
-    alertaCard: {
-      backgroundColor: colors.card,
-      borderRadius: 14,
-      padding: 14,
-      marginBottom: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-
-    alertaHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 8,
-    },
-
-    alertaNome: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.title,
-    },
-
-    alertaSaldo: {
-      fontWeight: '700',
-      color: '#ef4444',
-    },
-
-    alertaBarraFundo: {
-      height: 6,
-      backgroundColor: colors.border,
-      borderRadius: 4,
-      overflow: 'hidden',
-    },
-
-    alertaBarra: {
-      height: '100%',
       backgroundColor: '#ef4444',
+      marginBottom: 20,
+      padding: 16,
+      borderRadius: 12,
     },
-
+    alertaIcon: {
+      fontSize: 24,
+      marginRight: 12,
+      color: '#fff',
+    },
+    alertaText: {
+      flex: 1,
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '500',
+    },
     atividade: {
       backgroundColor: colors.card,
       borderRadius: 16,
@@ -306,53 +224,41 @@ export default function Dashboard() {
       borderWidth: 1,
       borderColor: colors.border,
     },
-
     atividadeRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginTop: 6,
     },
-
     atividadeLabel: {
       color: colors.subtitle,
     },
-
     entrada: {
       color: '#22c55e',
       fontWeight: 'bold',
     },
-
     saida: {
       color: '#ef4444',
       fontWeight: 'bold',
     },
-
   });
 
   return (
-
     <View style={styles.container}>
-
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-
         <View style={styles.header}>
           <Text style={styles.saudacao}>
             {dados.saudacao}
           </Text>
-
           <Text style={styles.data}>
             {dados.data}
           </Text>
         </View>
 
-
-        {/* RESUMO */}
-
+        {/* Cards de resumo */}
         <View style={styles.cardsContainer}>
-
           <View style={styles.card}>
             <Text style={styles.cardIcon}>📦</Text>
             <Text style={styles.cardValor}>
@@ -365,28 +271,19 @@ export default function Dashboard() {
 
           <View style={styles.card}>
             <Text style={styles.cardIcon}>⚠️</Text>
-            <Text
-              style={[
-                styles.cardValor,
-                { color: '#ef4444' },
-              ]}
-            >
-              {dados.itensBaixos}
+            <Text style={[styles.cardValor, { color: '#ef4444' }]}>
+              {totalAlertas}
             </Text>
-
             <Text style={styles.cardLabel}>
-              Produtos Baixos
+              Alertas Ativos
             </Text>
           </View>
 
           <View style={styles.card}>
             <Text style={styles.cardIcon}>⏱</Text>
-
             <Text style={styles.cardValor}>
-              {dados.ultimaMovimentacao?.hora ||
-                '--:--'}
+              {dados.ultimaMovimentacao?.hora || '--:--'}
             </Text>
-
             <Text style={styles.cardLabel}>
               Última Movimentação
             </Text>
@@ -394,164 +291,92 @@ export default function Dashboard() {
 
           <View style={styles.card}>
             <Text style={styles.cardIcon}>📊</Text>
-
             <Text style={styles.cardValor}>
               {dados.topProdutos.length > 0
                 ? dados.topProdutos[0].percentual
-                : 0}
-              %
+                : 0}%
             </Text>
-
             <Text style={styles.cardLabel}>
               Consumo do Mês
             </Text>
           </View>
-
         </View>
 
+        {/* Gráfico de Categorias */}
+        <GraficoCategorias />
 
-        {/* PRODUTOS MAIS UTILIZADOS */}
+        {/* Alerta de produtos vencidos */}
+        {totalVencidos > 0 && (
+          <View style={styles.alertaCard}>
+            <Text style={styles.alertaIcon}>⚠️</Text>
+            <Text style={styles.alertaText}>
+              {totalVencidos} produto(s) vencido(s)! 
+              Acesse o estoque para verificar.
+            </Text>
+          </View>
+        )}
 
+        {/* Produtos mais utilizados */}
         {dados.topProdutos.length > 0 && (
           <View style={styles.grafico}>
-
             <Text style={styles.secaoTitulo}>
               PRODUTOS MAIS UTILIZADOS (MÊS)
             </Text>
-
-          return (
-  <View style={styles.container}>
-
-    <ScrollView>
-
-      {/* outras seções */}
-
-      {/* PRODUTOS MAIS UTILIZADOS */}
-      {dados.topProdutos.length > 0 && (
-        <View style={styles.grafico}>
-
-          <Text style={styles.secaoTitulo}>
-            PRODUTOS MAIS UTILIZADOS (MÊS)
-          </Text>
-
-          <BarChart
-            data={{
-              labels: dados.topProdutos.map(p => p.nome),
-              datasets: [
-                {
-                  data: dados.topProdutos.map(p => p.quantidade)
+            <BarChart
+              data={{
+                labels: dados.topProdutos.map(p => p.nome.substring(0, 8) + (p.nome.length > 8 ? '...' : '')),
+                datasets: [
+                  {
+                    data: dados.topProdutos.map(p => p.quantidade)
+                  }
+                ]
+              }}
+              width={screenWidth - 72}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix=""
+              chartConfig={{
+                backgroundColor: colors.card,
+                backgroundGradientFrom: colors.card,
+                backgroundGradientTo: colors.card,
+                decimalPlaces: 0,
+                color: () => colors.icon,
+                labelColor: () => colors.text,
+                style: {
+                  borderRadius: 16
                 }
-              ]
-            }}
-            width={screenWidth - 40}
-            height={220}
-            yAxisLabel=""
-            yAxisSuffix=""
-            chartConfig={{
-              backgroundColor: colors.card,
-              backgroundGradientFrom: colors.card,
-              backgroundGradientTo: colors.card,
-              decimalPlaces: 0,
-              color: () => colors.icon,
-              labelColor: () => colors.text,
-            }}
-          />
-
-        </View>
-      )}
-
-    </ScrollView>
-
-  </View>
-);
-
+              }}
+              style={{
+                marginVertical: 8,
+                borderRadius: 16
+              }}
+            />
           </View>
         )}
 
-
-        {/* ALERTAS */}
-
-        {dados.estoqueBaixo.length > 0 && (
-          <View>
-
-            <Text style={styles.secaoTitulo}>
-              ALERTAS DE ESTOQUE BAIXO
-            </Text>
-
-            {dados.estoqueBaixo.map((item, i) => (
-
-              <View key={i} style={styles.alertaCard}>
-
-                <View style={styles.alertaHeader}>
-
-                  <Text style={styles.alertaNome}>
-                    {item.nome}
-                  </Text>
-
-                  <Text style={styles.alertaSaldo}>
-                    SALDO: {item.quantidade}
-                  </Text>
-
-                </View>
-
-                <View style={styles.alertaBarraFundo}>
-
-                  <View
-                    style={[
-                      styles.alertaBarra,
-                      {
-                        width: `${Math.min(
-                          100,
-                          (item.quantidade /
-                            item.minimo) *
-                            100
-                        )}%`,
-                      },
-                    ]}
-                  />
-
-                </View>
-
-              </View>
-
-            ))}
-
-          </View>
-        )}
-
-
-        {/* ATIVIDADE DIÁRIA */}
-
+        {/* Atividade Diária */}
         <View style={styles.atividade}>
-
           <Text style={styles.secaoTitulo}>
             ATIVIDADE DIÁRIA
           </Text>
-
           <View style={styles.atividadeRow}>
             <Text style={styles.atividadeLabel}>
               Total entradas
             </Text>
-
             <Text style={styles.entrada}>
               ↑ {dados.atividadeHoje.entradas}
             </Text>
           </View>
-
           <View style={styles.atividadeRow}>
             <Text style={styles.atividadeLabel}>
               Total saídas
             </Text>
-
             <Text style={styles.saida}>
               ↓ {dados.atividadeHoje.saidas}
             </Text>
           </View>
-
         </View>
-
       </ScrollView>
-
     </View>
   );
 }

@@ -1,20 +1,7 @@
-// utils/historicoUtils.ts
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Produto } from '../types/produto'; // Ajuste o caminho conforme seu projeto
-
-// Definição dos tipos localmente para evitar erros de import
-interface Movimentacao {
-  id: string;
-  produtoId: string;
-  tipo: 'retirada' | 'retorno';
-  quantidade: number; // No seu tipo é só quantidade
-  finalidade?: string;
-  data: string;
-  // Campos opcionais que podem existir
-  quantidadeUnidades?: number;
-  quantidadeKg?: number;
-}
+import { Produto } from '../produto';
+import { Movimentacao } from '../../services/movimentacao/types'; // ← IMPORTANDO do local correto
 
 interface DiaHistorico {
   data: string;
@@ -115,15 +102,12 @@ function processarMes(
       totalCategorias[categoria] = { kg: 0, unidades: 0 };
     }
 
-    // Como no seu tipo a movimentação tem apenas 'quantidade',
-    // vamos considerar que se o produto tem pesoPorUnidade, a quantidade é em kg
-    // caso contrário, é em unidades
-    if (produto.pesoPorUnidade) {
-      // É produto com peso, então quantidade é em kg
-      totalCategorias[categoria].kg += mov.quantidade;
-    } else {
-      // É produto por unidade
-      totalCategorias[categoria].unidades += mov.quantidade;
+    // Usar os campos específicos em vez de 'quantidade'
+    if (mov.quantidadeKg) {
+      totalCategorias[categoria].kg += mov.quantidadeKg;
+    }
+    if (mov.quantidadeUnidades) {
+      totalCategorias[categoria].unidades += mov.quantidadeUnidades;
     }
 
     // Atualizar produto
@@ -137,11 +121,8 @@ function processarMes(
       });
     }
     const prod = totalProdutosMap.get(produtoKey)!;
-    if (produto.pesoPorUnidade) {
-      prod.kg += mov.quantidade;
-    } else {
-      prod.unidades += mov.quantidade;
-    }
+    if (mov.quantidadeKg) prod.kg += mov.quantidadeKg;
+    if (mov.quantidadeUnidades) prod.unidades += mov.quantidadeUnidades;
   });
 
   // Converter produtos para array ordenado
@@ -157,20 +138,8 @@ function processarMes(
 
   // Calcular totais gerais do mês
   const totais = {
-    kg: movimentacoes.reduce((acc, mov) => {
-      const produto = produtos.find(p => p.id === mov.produtoId);
-      if (produto?.pesoPorUnidade) {
-        return acc + mov.quantidade;
-      }
-      return acc;
-    }, 0),
-    unidades: movimentacoes.reduce((acc, mov) => {
-      const produto = produtos.find(p => p.id === mov.produtoId);
-      if (!produto?.pesoPorUnidade) {
-        return acc + mov.quantidade;
-      }
-      return acc;
-    }, 0),
+    kg: movimentacoes.reduce((acc, mov) => acc + (mov.quantidadeKg || 0), 0),
+    unidades: movimentacoes.reduce((acc, mov) => acc + (mov.quantidadeUnidades || 0), 0),
   };
 
   return {
@@ -196,33 +165,16 @@ function processarDia(
 
   const movimentacoesComProduto = movimentacoes.map((mov) => {
     const produto = produtos.find(p => p.id === mov.produtoId);
-    // Determinar se a quantidade é kg ou unidades baseado no produto
-    const ehKg = produto?.pesoPorUnidade ? true : false;
     
     return {
       ...mov,
       nomeProduto: produto?.nome || 'Produto não encontrado',
       categoria: produto?.categoria || 'Sem categoria',
-      quantidadeKg: ehKg ? mov.quantidade : 0,
-      quantidadeUnidades: !ehKg ? mov.quantidade : 0,
     };
   });
 
-  const totalUnidades = movimentacoes.reduce((acc, mov) => {
-    const produto = produtos.find(p => p.id === mov.produtoId);
-    if (!produto?.pesoPorUnidade) {
-      return acc + mov.quantidade;
-    }
-    return acc;
-  }, 0);
-  
-  const totalKg = movimentacoes.reduce((acc, mov) => {
-    const produto = produtos.find(p => p.id === mov.produtoId);
-    if (produto?.pesoPorUnidade) {
-      return acc + mov.quantidade;
-    }
-    return acc;
-  }, 0);
+  const totalUnidades = movimentacoes.reduce((acc, mov) => acc + (mov.quantidadeUnidades || 0), 0);
+  const totalKg = movimentacoes.reduce((acc, mov) => acc + (mov.quantidadeKg || 0), 0);
 
   // Observação (depois integrar com sistema de observações)
   const observacao = '';

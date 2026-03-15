@@ -1,18 +1,19 @@
 // app/(tabs)/movimentacao.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { MovimentacaoInput } from '../../services/movimentacao/types'; 
 import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
   Alert,
-  ScrollView,
   FlatList,
   Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useEstoque } from '../context/estoqueStorage';
-import { useTheme } from '../context/ThemeContext';
+import { useEstoque } from '../../context/estoqueStorage';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function Movimentacao() {
   const { colors } = useTheme();

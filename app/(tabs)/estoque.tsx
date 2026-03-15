@@ -1,151 +1,219 @@
 // app/(tabs)/estoque.tsx
-import React, { useState, useMemo } from 'react';
-import { router } from 'expo-router';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
+  FlatList,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  Alert,
-  LayoutAnimation,
-  Platform,
-  UIManager,
+  TextInput,
+  Alert
 } from 'react-native';
-import { useEstoque } from '../context/estoqueStorage';
-import { useTheme } from '../context/ThemeContext';
-import { format, parseISO, differenceInDays, isBefore } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { useRouter } from 'expo-router';
+import { useEstoque } from '../../context/estoqueStorage';
+import { useTheme } from '../../context/ThemeContext';
+import { useAlertasEstoque } from '../../hooks/useAlertasEstoque';
+import { Produto } from '../../types/produto';
 
-// Ativar animações no Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-export default function Estoque() {
+export default function EstoqueScreen() {
+  const router = useRouter();
   const { colors } = useTheme();
-  const { produtos } = useEstoque();
+  const { produtos, removerProduto } = useEstoque();
+  const { 
+    produtosAbaixoDoMinimo, 
+    produtosVencendo, 
+    produtosVencidos,
+    totalAlertas 
+  } = useAlertasEstoque();
   
-  // Estados de expansão
-  const [categoriaExpandida, setCategoriaExpandida] = useState<string | null>(null);
-  const [produtoExpandido, setProdutoExpandido] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const [filtro, setFiltro] = useState<'todos' | 'alertas'>('todos');
 
-  // Função para animar expansões
-  const toggleAnimation = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-  };
-
-  // Agrupar produtos por categoria e ordenar
-  const produtosPorCategoria = useMemo(() => {
-    // Filtrar por busca se houver
-    let produtosFiltrados = produtos;
-    if (busca.trim()) {
-     produtosFiltrados = produtos.filter(p => 
-  p.nome.toLowerCase().includes(busca.toLowerCase()) ||
-  (p.categoria || '').toLowerCase().includes(busca.toLowerCase())
-);
-    }
-
-    // Agrupar por categoria
-    const categorias: Record<string, typeof produtos> = {};
-    
-    produtosFiltrados.forEach(produto => {
-      const cat = produto.categoria || 'Sem categoria';
-      if (!categorias[cat]) {
-        categorias[cat] = [];
-      }
-      categorias[cat].push(produto);
-    });
-
-    // Ordenar produtos dentro de cada categoria (alfabeticamente)
-    Object.keys(categorias).forEach(cat => {
-      categorias[cat].sort((a, b) => a.nome.localeCompare(b.nome));
-    });
-
-    // Ordenar categorias (alfabeticamente)
-    return Object.keys(categorias)
-      .sort((a, b) => a.localeCompare(b))
-      .map(cat => ({
-        nome: cat,
-        produtos: categorias[cat],
-        quantidade: categorias[cat].length,
-      }));
-  }, [produtos, busca]);
-
-  // Calcular alertas
-  const alertas = useMemo(() => {
-    const vencidos: any[] = [];
-    const vencendo: any[] = [];
-    const estoqueBaixo: any[] = [];
+  // Função para calcular dias restantes
+  const calcularDiasRestantes = (validade: string): number => {
+    if (!validade) return 999;
     const hoje = new Date();
-
-    produtos.forEach(produto => {
-      // Verificar validade (se existir)
-      if (produto.validade) {
-        try {
-          const dataValidade = parseISO(produto.validade);
-          const diasRestantes = differenceInDays(dataValidade, hoje);
-          
-          if (isBefore(dataValidade, hoje)) {
-            vencidos.push(produto);
-          } else if (diasRestantes <= 60) {
-            vencendo.push(produto);
-          }
-        } catch (e) {
-          // Data inválida, ignorar
-        }
-      }
-
-      // Verificar estoque baixo
-      if (produto.minimo > 0 && produto.quantidade <= produto.minimo) {
-        estoqueBaixo.push(produto);
-      }
-    });
-
-    return { vencidos, vencendo, estoqueBaixo };
-  }, [produtos]);
-
-  // Função para determinar cor da validade
-  const getValidadeCor = (validade?: string) => {
-    if (!validade) return colors.text; // Sem validade
+    hoje.setHours(0, 0, 0, 0);
     
-    try {
-      const hoje = new Date();
-      const dataValidade = parseISO(validade);
-      
-      if (isBefore(dataValidade, hoje)) return '#ef4444'; // Vencido - vermelho
-      
-      const diasRestantes = differenceInDays(dataValidade, hoje);
-      if (diasRestantes <= 60) return '#f97316'; // Vencendo - laranja
-      return '#22c55e'; // Normal - verde
-    } catch (e) {
-      return colors.text;
-    }
+    const dataValidade = new Date(validade);
+    dataValidade.setHours(0, 0, 0, 0);
+    
+    const diffTime = dataValidade.getTime() - hoje.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  // Formatar data
-  const formatarData = (data?: string) => {
-    if (!data) return 'Sem validade';
-    try {
-      return format(parseISO(data), 'dd/MM/yyyy');
-    } catch (e) {
-      return data;
+  // Filtrar produtos
+  const produtosFiltrados = useMemo(() => {
+    let lista = produtos;
+    
+    // Filtro por busca
+    if (busca.trim()) {
+      lista = lista.filter(p => 
+        p.nome.toLowerCase().includes(busca.toLowerCase()) ||
+        p.categoria.toLowerCase().includes(busca.toLowerCase())
+      );
     }
+    
+    // Filtro por alertas
+    if (filtro === 'alertas') {
+      const idsAlertas = [
+        ...produtosAbaixoDoMinimo.map(p => p.id),
+        ...produtosVencendo.map(p => p.id),
+        ...produtosVencidos.map(p => p.id)
+      ];
+      lista = lista.filter(p => idsAlertas.includes(p.id));
+    }
+    
+    return lista;
+  }, [produtos, busca, filtro, produtosAbaixoDoMinimo, produtosVencendo, produtosVencidos]);
+
+  const handleDelete = (produto: Produto) => {
+    Alert.alert(
+      'Excluir Produto',
+      `Tem certeza que deseja excluir ${produto.nome}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removerProduto(produto.id);
+            } catch (error) {
+              Alert.alert('Erro', 'Não foi possível excluir o produto');
+            }
+          }
+        }
+      ]
+    );
   };
 
-  // Calcular dias para vencer
-  const getDiasParaVencer = (validade?: string) => {
-    if (!validade) return null;
-    try {
-      const hoje = new Date();
-      const dataValidade = parseISO(validade);
-      const dias = differenceInDays(dataValidade, hoje);
-      return dias;
-    } catch (e) {
-      return null;
+  const getStatusProduto = (produto: Produto) => {
+    const estaAbaixoMinimo = produtosAbaixoDoMinimo.some(p => p.id === produto.id);
+    const estaVencendo = produtosVencendo.some(p => p.id === produto.id);
+    const estaVencido = produtosVencidos.some(p => p.id === produto.id);
+    
+    if (estaVencido) return 'vencido';
+    if (estaVencendo) return 'vencendo';
+    if (estaAbaixoMinimo) return 'baixo';
+    return 'normal';
+  };
+
+  const renderProduto = ({ item }: { item: Produto }) => {
+    const status = getStatusProduto(item);
+    
+    let statusColor = colors.border;
+    let statusText = '';
+    
+    if (status === 'vencido') {
+      statusColor = '#ef4444';
+      statusText = '⚠️ VENCIDO';
+    } else if (status === 'vencendo') {
+      statusColor = '#f59e0b';
+      statusText = '⚠️ Vence logo';
+    } else if (status === 'baixo') {
+      statusColor = '#eab308';
+      statusText = '⚠️ Estoque baixo';
     }
+
+    // Calcular total de lotes e quantidade
+    const totalLotes = item.lotes?.length || 0;
+    const lotesProximos = item.lotes?.filter(l => {
+      const dias = calcularDiasRestantes(l.validade);
+      return dias <= 7 && dias >= 0;
+    }).length || 0;
+
+    return (
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.cardHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.nome, { color: colors.title }]}>{item.nome}</Text>
+            <Text style={[styles.categoria, { color: colors.subtitle }]}>{item.categoria}</Text>
+          </View>
+          {status !== 'normal' && (
+            <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+              <Text style={styles.statusText}>{statusText}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.infoContainer}>
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: colors.subtitle }]}>Unidades:</Text>
+            <Text style={[styles.infoValue, { color: colors.title }]}>{item.quantidade}</Text>
+          </View>
+          
+          {item.quantidadeKg ? (
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: colors.subtitle }]}>Peso:</Text>
+              <Text style={[styles.infoValue, { color: colors.title }]}>{item.quantidadeKg} kg</Text>
+            </View>
+          ) : null}
+          
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: colors.subtitle }]}>Validade:</Text>
+            <Text style={[styles.infoValue, { color: colors.title }]}>
+              {item.validade 
+                ? new Date(item.validade).toLocaleDateString('pt-BR') 
+                : 'Não definida'}
+            </Text>
+          </View>
+
+          {/* Seção de lotes */}
+          {totalLotes > 0 && (
+            <View style={styles.lotesSection}>
+              <View style={styles.infoRow}>
+                <Text style={[styles.infoLabel, { color: colors.subtitle }]}>Total de lotes:</Text>
+                <Text style={[styles.infoValue, { color: colors.title }]}>{totalLotes}</Text>
+              </View>
+              
+              {lotesProximos > 0 && (
+                <View style={styles.infoRow}>
+                  <Text style={[styles.infoLabel, { color: colors.subtitle }]}>Lotes a vencer:</Text>
+                  <Text style={[styles.infoValue, { color: '#f59e0b', fontWeight: 'bold' }]}>
+                    {lotesProximos}
+                  </Text>
+                </View>
+              )}
+
+              {/* Botão para ver detalhes dos lotes */}
+              <TouchableOpacity 
+                style={styles.verLotesButton}
+                onPress={() => {
+                  Alert.alert(
+                    'Lotes do Produto',
+                    item.lotes?.map(l => 
+                      `📅 ${new Date(l.validade).toLocaleDateString('pt-BR')}: ${
+                        l.quantidadeUnidades ? `${l.quantidadeUnidades} un` : ''
+                      } ${
+                        l.quantidadeKg ? `${l.quantidadeKg} kg` : ''
+                      }`
+                    ).join('\n\n')
+                  );
+                }}
+              >
+                <Text style={styles.verLotesText}>Ver detalhes dos lotes</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity 
+            style={[styles.button, styles.editButton]}
+            onPress={() => router.push(`/editar-produto?id=${item.id}`)}
+          >
+            <Text style={styles.buttonText}>Editar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.button, styles.deleteButton]}
+            onPress={() => handleDelete(item)}
+          >
+            <Text style={styles.buttonText}>Excluir</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
 
   const styles = StyleSheet.create({
@@ -155,219 +223,145 @@ export default function Estoque() {
     },
     header: {
       padding: 16,
-      paddingBottom: 8,
     },
     title: {
       fontSize: 28,
       fontWeight: 'bold',
       color: colors.title,
-      marginBottom: 12,
-      textAlign: 'center',
-    },
-    buscaInput: {
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 30,
-      padding: 12,
-      paddingHorizontal: 20,
-      fontSize: 16,
-      color: colors.text,
-    },
-    alertasContainer: {
-      paddingHorizontal: 16,
-      marginBottom: 16,
-    },
-    alertaCard: {
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 12,
       marginBottom: 8,
-      borderLeftWidth: 4,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 4,
-      elevation: 2,
     },
-    alertaHeader: {
+    subtitle: {
+      fontSize: 14,
+      color: colors.subtitle,
+    },
+    searchContainer: {
       flexDirection: 'row',
-      alignItems: 'center',
+      padding: 16,
       gap: 8,
     },
-    alertaIcon: {
-      fontSize: 20,
-    },
-    alertaTitulo: {
-      fontSize: 16,
-      fontWeight: '600',
+    searchInput: {
       flex: 1,
-    },
-    alertaContagem: {
-      fontSize: 14,
-      fontWeight: '700',
-    },
-    alertaLista: {
-      marginTop: 8,
-      paddingLeft: 28,
-    },
-    alertaItem: {
-      fontSize: 14,
-      color: colors.text,
-      marginBottom: 4,
-    },
-    categoriaContainer: {
-      marginBottom: 8,
       backgroundColor: colors.card,
-      borderRadius: 16,
-      marginHorizontal: 16,
-      overflow: 'hidden',
       borderWidth: 1,
       borderColor: colors.border,
-    },
-    categoriaHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-      backgroundColor: colors.card,
-    },
-    categoriaIcon: {
-      fontSize: 20,
-      marginRight: 8,
-    },
-    categoriaNome: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: colors.title,
-      flex: 1,
-    },
-    categoriaBadge: {
-      backgroundColor: colors.icon + '20',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 12,
-      marginRight: 8,
-    },
-    categoriaBadgeTexto: {
-      fontSize: 12,
-      color: colors.icon,
-      fontWeight: '600',
-    },
-    expandIcon: {
-      fontSize: 18,
-      color: colors.subtitle,
-    },
-    produtoItem: {
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-    },
-    produtoHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-      backgroundColor: colors.background,
-    },
-    produtoIcon: {
-      fontSize: 20,
-      marginRight: 8,
-    },
-    produtoNome: {
-      fontSize: 16,
-      fontWeight: '500',
-      color: colors.text,
-      flex: 1,
-    },
-    produtoEstoque: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.title,
-      marginRight: 8,
-    },
-    produtoBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 2,
       borderRadius: 8,
-      marginRight: 8,
+      padding: 12,
+      color: colors.text,
     },
-    produtoBadgeTexto: {
-      fontSize: 10,
+    filterButton: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      justifyContent: 'center',
+    },
+    filterButtonAtivo: {
+      backgroundColor: colors.icon,
+      borderColor: colors.icon,
+    },
+    filterText: {
+      color: colors.text,
+      fontWeight: '500',
+    },
+    filterTextAtivo: {
       color: '#fff',
-      fontWeight: '600',
     },
-    produtoExpandido: {
+    list: {
       padding: 16,
-      paddingTop: 0,
-      backgroundColor: colors.background,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
     },
-    detalheRow: {
+    card: {
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+    },
+    cardHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginBottom: 8,
+      alignItems: 'flex-start',
+      marginBottom: 12,
     },
-    detalheLabel: {
+    nome: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginBottom: 4,
+    },
+    categoria: {
       fontSize: 14,
-      color: colors.subtitle,
     },
-    detalheValor: {
+    statusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 4,
+    },
+    statusText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    infoContainer: {
+      marginBottom: 12,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 4,
+    },
+    infoLabel: {
       fontSize: 14,
-      fontWeight: '600',
-      color: colors.text,
     },
-    validadeContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
+    infoValue: {
+      fontSize: 14,
+      fontWeight: '500',
     },
-    validadeIndicador: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-    },
-    botoesContainer: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      gap: 12,
+    lotesSection: {
       marginTop: 12,
       paddingTop: 12,
       borderTopWidth: 1,
       borderTopColor: colors.border,
     },
-    botaoAcao: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 8,
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    botaoAcaoTexto: {
-      fontSize: 12,
-      color: colors.text,
-    },
-    botaoPerigo: {
-      borderColor: '#ef4444',
-    },
-    botaoPerigoTexto: {
-      color: '#ef4444',
-    },
-    addButton: {
-      backgroundColor: colors.icon,
-      marginHorizontal: 16,
-      marginVertical: 20,
-      paddingVertical: 16,
-      borderRadius: 16,
+    verLotesButton: {
+      marginTop: 8,
+      padding: 8,
+      backgroundColor: colors.background,
+      borderRadius: 6,
       alignItems: 'center',
     },
-    addButtonText: {
+    verLotesText: {
+      color: colors.icon,
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    actions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    button: {
+      flex: 1,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    editButton: {
+      backgroundColor: colors.icon,
+    },
+    deleteButton: {
+      backgroundColor: '#ef4444',
+    },
+    buttonText: {
       color: '#fff',
-      fontSize: 16,
-      fontWeight: '700',
+      fontWeight: '600',
     },
     emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
       alignItems: 'center',
-      padding: 40,
+      padding: 32,
+    },
+    emptyIcon: {
+      fontSize: 48,
+      marginBottom: 16,
     },
     emptyText: {
       fontSize: 16,
@@ -376,245 +370,55 @@ export default function Estoque() {
     },
   });
 
+  if (produtosFiltrados.length === 0) {
+    return (
+      <View style={[styles.container, styles.emptyContainer]}>
+        <Text style={styles.emptyIcon}>📦</Text>
+        <Text style={styles.emptyText}>
+          {busca || filtro === 'alertas' 
+            ? 'Nenhum produto encontrado com os filtros aplicados'
+            : 'Nenhum produto cadastrado'}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.title}>📦 Estoque</Text>
-          <TextInput
-  style={styles.buscaInput}
-  placeholder="Buscar produto ou categoria..."
-  placeholderTextColor={colors.subtitle}
-            value={busca}
-            onChangeText={setBusca}
-          />
-        </View>
+      <View style={styles.header}>
+        <Text style={styles.title}>Estoque</Text>
+        <Text style={styles.subtitle}>
+          {totalAlertas > 0 
+            ? `⚠️ ${totalAlertas} alerta(s) ativo(s)` 
+            : 'Todos os produtos estão OK'}
+        </Text>
+      </View>
 
-        {/* Painel de Alertas */}
-        {(alertas.vencidos.length > 0 || alertas.vencendo.length > 0 || alertas.estoqueBaixo.length > 0) && (
-          <View style={styles.alertasContainer}>
-            {alertas.vencidos.length > 0 && (
-              <View style={[styles.alertaCard, { borderLeftColor: '#ef4444' }]}>
-                <View style={styles.alertaHeader}>
-                  <Text style={styles.alertaIcon}>🔴</Text>
-                  <Text style={styles.alertaTitulo}>Vencidos</Text>
-                  <Text style={[styles.alertaContagem, { color: '#ef4444' }]}>
-                    {alertas.vencidos.length}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {alertas.vencendo.length > 0 && (
-              <View style={[styles.alertaCard, { borderLeftColor: '#f97316' }]}>
-                <View style={styles.alertaHeader}>
-                  <Text style={styles.alertaIcon}>🟠</Text>
-                  <Text style={styles.alertaTitulo}>Vencendo em 60 dias</Text>
-                  <Text style={[styles.alertaContagem, { color: '#f97316' }]}>
-                    {alertas.vencendo.length}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {alertas.estoqueBaixo.length > 0 && (
-              <View style={[styles.alertaCard, { borderLeftColor: '#3b82f6' }]}>
-                <View style={styles.alertaHeader}>
-                  <Text style={styles.alertaIcon}>🔵</Text>
-                  <Text style={styles.alertaTitulo}>Estoque baixo</Text>
-                  <Text style={[styles.alertaContagem, { color: '#3b82f6' }]}>
-                    {alertas.estoqueBaixo.length}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Lista de Categorias */}
-        {produtosPorCategoria.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {busca ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado'}
-            </Text>
-          </View>
-        ) : (
-          produtosPorCategoria.map((categoria) => (
-            <View key={categoria.nome} style={styles.categoriaContainer}>
-              {/* Cabeçalho da Categoria */}
-              <TouchableOpacity
-                style={styles.categoriaHeader}
-                onPress={() => {
-                  toggleAnimation();
-                  setCategoriaExpandida(
-                    categoriaExpandida === categoria.nome ? null : categoria.nome
-                  );
-                  setProdutoExpandido(null); // Recolhe produtos ao trocar categoria
-                }}
-              >
-                <Text style={styles.categoriaIcon}>📁</Text>
-                <Text style={styles.categoriaNome}>{categoria.nome}</Text>
-                <View style={styles.categoriaBadge}>
-                  <Text style={styles.categoriaBadgeTexto}>
-                    {categoria.quantidade} itens
-                  </Text>
-                </View>
-                <Text style={styles.expandIcon}>
-                  {categoriaExpandida === categoria.nome ? '▼' : '▶'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Produtos da Categoria (expandido) */}
-              {categoriaExpandida === categoria.nome && (
-                <View>
-                  {categoria.produtos.map((produto) => {
-                    const diasParaVencer = getDiasParaVencer(produto.validade);
-                    const validadeCor = getValidadeCor(produto.validade);
-                    const isEstoqueBaixo = produto.minimo > 0 && produto.quantidade <= produto.minimo;
-
-                    return (
-                      <View key={produto.id} style={styles.produtoItem}>
-                        {/* Cabeçalho do Produto */}
-                        <TouchableOpacity
-                          style={styles.produtoHeader}
-                          onPress={() => {
-                            toggleAnimation();
-                            setProdutoExpandido(
-                              produtoExpandido === produto.id ? null : produto.id
-                            );
-                          }}
-                        >
-                          <Text style={styles.produtoIcon}>📦</Text>
-                          <Text style={styles.produtoNome}>{produto.nome}</Text>
-                         <Text
-  style={[
-    styles.produtoEstoque,
-    isEstoqueBaixo && { color: '#3b82f6' }
-  ]}
->
-                            {produto.pesoPorUnidade 
-                              ? `${produto.quantidade} kg` 
-                              : `${produto.quantidade} un`}
-                          </Text>
-                          
-                          {/* Badge de alerta */}
-                          {diasParaVencer !== null && diasParaVencer < 0 && (
-                            <View style={[styles.produtoBadge, { backgroundColor: '#ef4444' }]}>
-                              <Text style={styles.produtoBadgeTexto}>VENCIDO</Text>
-                            </View>
-                          )}
-                          {diasParaVencer !== null && diasParaVencer >= 0 && diasParaVencer <= 60 && (
-                            <View style={[styles.produtoBadge, { backgroundColor: '#f97316' }]}>
-                              <Text style={styles.produtoBadgeTexto}>{diasParaVencer}d</Text>
-                            </View>
-                          )}
-                          {isEstoqueBaixo && (
-                            <View style={[styles.produtoBadge, { backgroundColor: '#3b82f6' }]}>
-                              <Text style={styles.produtoBadgeTexto}>BAIXO</Text>
-                            </View>
-                          )}
-                          
-                          <Text style={styles.expandIcon}>
-                            {produtoExpandido === produto.id ? '▼' : '▶'}
-                          </Text>
-                        </TouchableOpacity>
-
-                        {/* Detalhes do Produto (expandido) */}
-                        {produtoExpandido === produto.id && (
-                          <View style={styles.produtoExpandido}>
-                            <View style={styles.detalheRow}>
-                              <Text style={styles.detalheLabel}>Quantidade:</Text>
-                              <Text style={styles.detalheValor}>
-                                {produto.pesoPorUnidade 
-                                  ? `${produto.quantidade} kg` 
-                                  : `${produto.quantidade} unidades`}
-                              </Text>
-                            </View>
-
-                            <View style={styles.detalheRow}>
-                              <Text style={styles.detalheLabel}>Estoque mínimo:</Text>
-                              <Text style={styles.detalheValor}>
-                                {produto.pesoPorUnidade 
-                                  ? `${produto.minimo} kg` 
-                                  : `${produto.minimo} unidades`}
-                              </Text>
-                            </View>
-
-                            <View style={styles.detalheRow}>
-                              <Text style={styles.detalheLabel}>Categoria:</Text>
-                          <Text style={styles.detalheValor}>
-  {produto.categoria || 'Sem categoria'}
-</Text>
-                            </View>
-
-                            <View style={styles.detalheRow}>
-                              <Text style={styles.detalheLabel}>Validade:</Text>
-                              <View style={styles.validadeContainer}>
-                                <View style={[styles.validadeIndicador, { backgroundColor: validadeCor }]} />
-                                <Text style={[styles.detalheValor, { color: validadeCor }]}>
-                                  {formatarData(produto.validade)}
-                                  {diasParaVencer !== null && diasParaVencer > 0 && ` (${diasParaVencer} dias)`}
-                                  {diasParaVencer !== null && diasParaVencer < 0 && ` (vencido há ${Math.abs(diasParaVencer)} dias)`}
-                                </Text>
-                              </View>
-                            </View>
-
-                            {produto.descricao && (
-                              <View style={styles.detalheRow}>
-                                <Text style={styles.detalheLabel}>Descrição:</Text>
-                                <Text style={styles.detalheValor}>{produto.descricao}</Text>
-                              </View>
-                            )}
-
-                            {/* Botões de ação */}
-                            <View style={styles.botoesContainer}>
-                              <TouchableOpacity 
-                                style={styles.botaoAcao}
-                                onPress={() => Alert.alert('Editar', `Editar ${produto.nome}`)}
-                              >
-                                <Text style={styles.botaoAcaoTexto}>✏️ Editar</Text>
-                              </TouchableOpacity>
-                              
-                              <TouchableOpacity 
-                                style={styles.botaoAcao}
-                                onPress={() => Alert.alert('Movimentar', `Movimentar ${produto.nome}`)}
-                              >
-                                <Text style={styles.botaoAcaoTexto}>📦 Movimentar</Text>
-                              </TouchableOpacity>
-                              
-                              <TouchableOpacity 
-                                style={[styles.botaoAcao, styles.botaoPerigo]}
-                                onPress={() => Alert.alert(
-                                  'Confirmar exclusão',
-                                  `Deseja excluir ${produto.nome}?`,
-                                  [
-                                    { text: 'Cancelar', style: 'cancel' },
-                                    { text: 'Excluir', style: 'destructive' }
-                                  ]
-                                )}
-                              >
-                                <Text style={[styles.botaoAcaoTexto, styles.botaoPerigoTexto]}>🗑️ Excluir</Text>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          ))
-        )}
-
-        {/* Botão Adicionar Produto */}
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => router.push('/cadastro')}
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar produto..."
+          placeholderTextColor={colors.subtitle}
+          value={busca}
+          onChangeText={setBusca}
+        />
+        <TouchableOpacity
+          style={[styles.filterButton, filtro === 'alertas' && styles.filterButtonAtivo]}
+          onPress={() => setFiltro(filtro === 'alertas' ? 'todos' : 'alertas')}
         >
-          <Text style={styles.addButtonText}>➕ Adicionar Produto</Text>
+          <Text style={[styles.filterText, filtro === 'alertas' && styles.filterTextAtivo]}>
+            ⚠️ Alertas
+          </Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
+
+      <FlatList
+        data={produtosFiltrados}
+        keyExtractor={(item) => item.id}
+        renderItem={renderProduto}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+      />
     </View>
   );
 }

@@ -1,15 +1,15 @@
 // components/historico/ObservacaoDia.tsx
 import React, { useState } from 'react';
 import {
-  View,
+  Alert,
+  StyleSheet,
   Text,
   TextInput,
-  StyleSheet,
   TouchableOpacity,
-  Alert,
+  View,
 } from 'react-native';
-import { useTheme } from '../../app/context/ThemeContext';
-import { useEstoque } from '../../app/context/estoqueStorage';
+import { useTheme } from '../../context/ThemeContext';
+import { useEstoque } from '../../context/estoqueStorage';
 
 interface Props {
   data: string;

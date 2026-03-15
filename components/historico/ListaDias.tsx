@@ -1,12 +1,12 @@
 // components/historico/ListaDias.tsx
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
   StyleSheet,
+  Text,
   TouchableOpacity,
+  View,
 } from 'react-native';
-import { useTheme } from '../../app/context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 import { DiaHistorico } from '../../types/historico';
 import ObservacaoDia from './ObservacaoDia';
 

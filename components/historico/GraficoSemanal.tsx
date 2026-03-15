@@ -1,14 +1,14 @@
 // components/historico/GraficoSemanal.tsx
 import React, { useMemo } from 'react';
 import {
-    StyleSheet,
-    Text,
-    View
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
-import { useTheme } from '../../app/context/ThemeContext';
-import { useEstoque } from '../../app/context/estoqueStorage';
+import { useTheme } from '../../context/ThemeContext';
+import { useEstoque } from '../../context/estoqueStorage';
 import { MesHistorico } from '../../types/historico';
-import { calcularConsumoSemanal } from '../../utils/histoticoUtils';
+import { calcularConsumoSemanal } from '../../types/utils/histoticoUtils';
 
 interface Props {
   mes: MesHistorico;

@@ -1,18 +1,18 @@
 // components/historico/CardMes.tsx
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   LayoutAnimation,
   Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
   UIManager,
+  View,
 } from 'react-native';
-import { useTheme } from '../../app/context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 import { MesHistorico } from '../../types/historico';
-import TotalCategoria from './Totalcategoria';
 import ListaDias from './ListaDias';
+import TotalCategoria from './Totalcategoria';
 
 // Ativar animações no Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
