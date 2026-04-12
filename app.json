@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIn": "bundleIn"
+      "bundleIdentifier": "com.meuestoque.app"
     },
     "android": {
       "package": "com.meuestoque.app",

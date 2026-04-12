@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { Produto } from "../../types/produto";
+=======
+import { Produto } from "../types/produto";
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
 
 export const produtos: Produto[] = [
   {

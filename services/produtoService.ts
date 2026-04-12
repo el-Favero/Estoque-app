@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { db, auth } from "../src/firebaseConfig";
+=======
+import { db } from "../src/firebaseConfig";
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
 import {
   collection,
   addDoc,
@@ -13,6 +17,7 @@ import {
 import { Produto, LoteProduto } from "../types/produto";
 import { validadeParaISO } from "../utils/validadeUtils";
 
+<<<<<<< HEAD
 function getCurrentUserId(): string {
   const user = auth.currentUser;
   if (!user) {
@@ -32,6 +37,8 @@ function checkAuth(): boolean {
   return true;
 }
 
+=======
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
 // Remove qualquer campo com valor undefined antes de enviar ao Firestore
 function removeUndefined<T extends Record<string, any>>(obj: T): T {
   const novo: Record<string, any> = {};
@@ -44,6 +51,7 @@ function removeUndefined<T extends Record<string, any>>(obj: T): T {
   return novo as T;
 }
 
+<<<<<<< HEAD
 // Gera ID único para lote
 function gerarIdLote(): string {
   return `lote_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -76,6 +84,13 @@ export const createProduto = async (
       ...produto,
       userId,
     });
+=======
+export const createProduto = async (
+  produto: Omit<Produto, "id">
+): Promise<string> => {
+  try {
+    const docRef = await addDoc(collection(db, "produtos"), produto);
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
     return docRef.id;
   } catch (error) {
     console.error("Erro ao criar produto:", error);
@@ -85,6 +100,7 @@ export const createProduto = async (
 
 export const getProdutos = async (): Promise<Produto[]> => {
   try {
+<<<<<<< HEAD
     const userId = getCurrentUserId();
     if (!userId) {
       console.warn("getProdutos: Usuário não logado, retornando array vazio");
@@ -92,6 +108,9 @@ export const getProdutos = async (): Promise<Produto[]> => {
     }
     const q = query(collection(db, "produtos"), where("userId", "==", userId));
     const querySnapshot = await getDocs(q);
+=======
+    const querySnapshot = await getDocs(collection(db, "produtos"));
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
     const produtos: Produto[] = [];
     querySnapshot.forEach((snap) => {
       produtos.push({ id: snap.id, ...snap.data() } as Produto);
@@ -99,7 +118,11 @@ export const getProdutos = async (): Promise<Produto[]> => {
     return produtos;
   } catch (error) {
     console.error("Erro detalhado ao buscar produtos:", error);
+<<<<<<< HEAD
     return [];
+=======
+    throw error;
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
   }
 };
 // Adicione esta função depois da getProdutos
@@ -148,6 +171,7 @@ export const findProdutoPorNomeECategoria = async (
   nome: string,
   categoria: string
 ): Promise<Produto | null> => {
+<<<<<<< HEAD
   const userId = getCurrentUserId();
   if (!userId) {
     return null;
@@ -156,6 +180,11 @@ export const findProdutoPorNomeECategoria = async (
   const q = query(
     produtosRef,
     where("userId", "==", userId),
+=======
+  const produtosRef = collection(db, "produtos");
+  const q = query(
+    produtosRef,
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
     where("nome", "==", nome),
     where("categoria", "==", categoria)
   );
@@ -167,6 +196,7 @@ export const findProdutoPorNomeECategoria = async (
   return { id: docSnap.id, ...(docSnap.data() as any) } as Produto;
 };
 
+<<<<<<< HEAD
 export const findProdutoPorCodigoBarras = async (
   codigo: string
 ): Promise<Produto | null> => {
@@ -186,6 +216,8 @@ export const findProdutoPorCodigoBarras = async (
   return { id: docSnap.id, ...(docSnap.data() as any) } as Produto;
 };
 
+=======
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
 // Adiciona um lote a um produto existente OU cria o produto se ainda não existir
 export const adicionarLoteOuCriarProduto = async (params: {
   nome: string;
@@ -194,7 +226,10 @@ export const adicionarLoteOuCriarProduto = async (params: {
   validade: string;
   quantidadeUnidades: number;
   quantidadeKg?: number;
+<<<<<<< HEAD
   codigoBarras?: string;
+=======
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
 }): Promise<string> => {
   const {
     nome,
@@ -203,6 +238,7 @@ export const adicionarLoteOuCriarProduto = async (params: {
     validade,
     quantidadeUnidades,
     quantidadeKg,
+<<<<<<< HEAD
     codigoBarras,
   } = params;
 
@@ -225,18 +261,41 @@ export const adicionarLoteOuCriarProduto = async (params: {
 
     const novoProduto: Omit<Produto, "id"> = removeUndefined({
       userId,
+=======
+  } = params;
+
+  const validadeISO = validadeParaISO(validade);
+
+  const lote: LoteProduto = removeUndefined({
+    validade: validadeISO,
+    quantidadeUnidades:
+      quantidadeUnidades > 0 ? quantidadeUnidades : undefined,
+    quantidadeKg: quantidadeKg && quantidadeKg > 0 ? quantidadeKg : undefined,
+  });
+
+  const existente = await findProdutoPorNomeECategoria(nome, categoria);
+
+  if (!existente) {
+    const novoProduto: Omit<Produto, "id"> = removeUndefined({
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
       nome,
       categoria,
       descricao,
       quantidade: quantidadeUnidades,
       quantidadeKg: quantidadeKg,
+<<<<<<< HEAD
       validade: validadeISO, // mais próxima
       lotes: [novoLote],
       codigoBarras: codigoBarras?.trim() || undefined,
+=======
+      validade: validadeISO,
+      lotes: [lote],
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
     });
     return await createProduto(novoProduto);
   }
 
+<<<<<<< HEAD
   // Produto existe - verificar se já tem lote com mesma validade
   const lotesAtuais: LoteProduto[] = existente.lotes || [];
   const indiceLoteExistente = encontrarIndiceLotePorValidade(
@@ -296,11 +355,27 @@ export const adicionarLoteOuCriarProduto = async (params: {
       codigoBarras?.trim() && !existente.codigoBarras
         ? codigoBarras.trim()
         : undefined,
+=======
+  const produtoRef = doc(db, "produtos", existente.id);
+  const lotesAtuais: LoteProduto[] = existente.lotes || [];
+
+  const quantidadeTotalUnidades =
+    (existente.quantidade || 0) + (quantidadeUnidades || 0);
+  const quantidadeTotalKg =
+    (existente.quantidadeKg || 0) + (quantidadeKg || 0);
+
+  const dadosAtualizados = removeUndefined({
+    quantidade: quantidadeTotalUnidades,
+    quantidadeKg: quantidadeTotalKg || undefined,
+    validade: validadeISO,
+    lotes: [...lotesAtuais, lote],
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
   });
 
   await updateDoc(produtoRef, dadosAtualizados);
 
   return existente.id;
+<<<<<<< HEAD
 };
 
 // Tipos para saída FIFO
@@ -456,4 +531,6 @@ export const buscarProdutosPorNome = async (
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Produto));
+=======
+>>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
 };
