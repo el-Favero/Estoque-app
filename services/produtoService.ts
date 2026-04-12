@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { db, auth } from "../src/firebaseConfig";
-=======
-import { db } from "../src/firebaseConfig";
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
 import {
   collection,
   addDoc,
@@ -17,29 +13,14 @@ import {
 import { Produto, LoteProduto } from "../types/produto";
 import { validadeParaISO } from "../utils/validadeUtils";
 
-<<<<<<< HEAD
 function getCurrentUserId(): string {
   const user = auth.currentUser;
   if (!user) {
-    // Retornar string vazia em vez de erro - callers devem tratar
     return "";
   }
   return user.uid;
 }
 
-// Verifica se pode fazer operações que precisam de usuário
-function checkAuth(): boolean {
-  const userId = getCurrentUserId();
-  if (!userId) {
-    console.warn("Operação requer login");
-    return false;
-  }
-  return true;
-}
-
-=======
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
-// Remove qualquer campo com valor undefined antes de enviar ao Firestore
 function removeUndefined<T extends Record<string, any>>(obj: T): T {
   const novo: Record<string, any> = {};
   Object.keys(obj).forEach((chave) => {
@@ -51,21 +32,14 @@ function removeUndefined<T extends Record<string, any>>(obj: T): T {
   return novo as T;
 }
 
-<<<<<<< HEAD
-// Gera ID único para lote
 function gerarIdLote(): string {
   return `lote_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-// Encontra índice de lote pela validade
-function encontrarIndiceLotePorValidade(
-  lotes: LoteProduto[],
-  validade: string
-): number {
+function encontrarIndiceLotePorValidade(lotes: LoteProduto[], validade: string): number {
   return lotes.findIndex((l) => l.validade === validade);
 }
 
-// Ordena lotes por validade (mais próxima primeiro) - FIFO
 function ordenarLotesPorValidade(lotes: LoteProduto[]): LoteProduto[] {
   return [...lotes].sort(
     (a, b) => new Date(a.validade).getTime() - new Date(b.validade).getTime()
@@ -84,13 +58,6 @@ export const createProduto = async (
       ...produto,
       userId,
     });
-=======
-export const createProduto = async (
-  produto: Omit<Produto, "id">
-): Promise<string> => {
-  try {
-    const docRef = await addDoc(collection(db, "produtos"), produto);
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
     return docRef.id;
   } catch (error) {
     console.error("Erro ao criar produto:", error);
@@ -100,7 +67,6 @@ export const createProduto = async (
 
 export const getProdutos = async (): Promise<Produto[]> => {
   try {
-<<<<<<< HEAD
     const userId = getCurrentUserId();
     if (!userId) {
       console.warn("getProdutos: Usuário não logado, retornando array vazio");
@@ -108,9 +74,6 @@ export const getProdutos = async (): Promise<Produto[]> => {
     }
     const q = query(collection(db, "produtos"), where("userId", "==", userId));
     const querySnapshot = await getDocs(q);
-=======
-    const querySnapshot = await getDocs(collection(db, "produtos"));
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
     const produtos: Produto[] = [];
     querySnapshot.forEach((snap) => {
       produtos.push({ id: snap.id, ...snap.data() } as Produto);
@@ -118,24 +81,18 @@ export const getProdutos = async (): Promise<Produto[]> => {
     return produtos;
   } catch (error) {
     console.error("Erro detalhado ao buscar produtos:", error);
-<<<<<<< HEAD
     return [];
-=======
-    throw error;
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
   }
 };
-// Adicione esta função depois da getProdutos
+
 export const getProduto = async (id: string): Promise<Produto | null> => {
   try {
     const produtoRef = doc(db, "produtos", id);
     const produtoSnap = await getDoc(produtoRef);
-    
     if (produtoSnap.exists()) {
       return { id: produtoSnap.id, ...produtoSnap.data() } as Produto;
-    } else {
-      return null; // Produto não encontrado
     }
+    return null;
   } catch (error) {
     console.error("Erro ao buscar produto:", error);
     throw error;
@@ -166,37 +123,25 @@ export const deleteProduto = async (id: string): Promise<void> => {
   }
 };
 
-// Busca um produto existente pelo par (nome, categoria)
 export const findProdutoPorNomeECategoria = async (
   nome: string,
   categoria: string
 ): Promise<Produto | null> => {
-<<<<<<< HEAD
   const userId = getCurrentUserId();
-  if (!userId) {
-    return null;
-  }
+  if (!userId) return null;
   const produtosRef = collection(db, "produtos");
   const q = query(
     produtosRef,
     where("userId", "==", userId),
-=======
-  const produtosRef = collection(db, "produtos");
-  const q = query(
-    produtosRef,
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
     where("nome", "==", nome),
     where("categoria", "==", categoria)
   );
-
   const snap = await getDocs(q);
   if (snap.empty) return null;
-
   const docSnap = snap.docs[0];
-  return { id: docSnap.id, ...(docSnap.data() as any) } as Produto;
+  return { id: docSnap.id, ...docSnap.data() } as Produto;
 };
 
-<<<<<<< HEAD
 export const findProdutoPorCodigoBarras = async (
   codigo: string
 ): Promise<Produto | null> => {
@@ -213,12 +158,9 @@ export const findProdutoPorCodigoBarras = async (
   const snap = await getDocs(q);
   if (snap.empty) return null;
   const docSnap = snap.docs[0];
-  return { id: docSnap.id, ...(docSnap.data() as any) } as Produto;
+  return { id: docSnap.id, ...docSnap.data() } as Produto;
 };
 
-=======
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
-// Adiciona um lote a um produto existente OU cria o produto se ainda não existir
 export const adicionarLoteOuCriarProduto = async (params: {
   nome: string;
   categoria: string;
@@ -226,111 +168,59 @@ export const adicionarLoteOuCriarProduto = async (params: {
   validade: string;
   quantidadeUnidades: number;
   quantidadeKg?: number;
-<<<<<<< HEAD
   codigoBarras?: string;
-=======
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
 }): Promise<string> => {
-  const {
-    nome,
-    categoria,
-    descricao,
-    validade,
-    quantidadeUnidades,
-    quantidadeKg,
-<<<<<<< HEAD
-    codigoBarras,
-  } = params;
-
+  const { nome, categoria, descricao, validade, quantidadeUnidades, quantidadeKg, codigoBarras } = params;
   const validadeISO = validadeParaISO(validade);
   const dataEntrada = new Date().toISOString();
-
   const existente = await findProdutoPorNomeECategoria(nome, categoria);
 
-  // Se não existe, criar novo produto com primeiro lote
   if (!existente) {
     const userId = getCurrentUserId();
     const novoLote: LoteProduto = {
       id: gerarIdLote(),
       validade: validadeISO,
-      quantidadeUnidades:
-        quantidadeUnidades > 0 ? quantidadeUnidades : undefined,
+      quantidadeUnidades: quantidadeUnidades > 0 ? quantidadeUnidades : undefined,
       quantidadeKg: quantidadeKg && quantidadeKg > 0 ? quantidadeKg : undefined,
       dataEntrada,
     };
-
     const novoProduto: Omit<Produto, "id"> = removeUndefined({
       userId,
-=======
-  } = params;
-
-  const validadeISO = validadeParaISO(validade);
-
-  const lote: LoteProduto = removeUndefined({
-    validade: validadeISO,
-    quantidadeUnidades:
-      quantidadeUnidades > 0 ? quantidadeUnidades : undefined,
-    quantidadeKg: quantidadeKg && quantidadeKg > 0 ? quantidadeKg : undefined,
-  });
-
-  const existente = await findProdutoPorNomeECategoria(nome, categoria);
-
-  if (!existente) {
-    const novoProduto: Omit<Produto, "id"> = removeUndefined({
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
       nome,
       categoria,
       descricao,
       quantidade: quantidadeUnidades,
       quantidadeKg: quantidadeKg,
-<<<<<<< HEAD
-      validade: validadeISO, // mais próxima
+      validade: validadeISO,
       lotes: [novoLote],
       codigoBarras: codigoBarras?.trim() || undefined,
-=======
-      validade: validadeISO,
-      lotes: [lote],
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
     });
     return await createProduto(novoProduto);
   }
 
-<<<<<<< HEAD
-  // Produto existe - verificar se já tem lote com mesma validade
   const lotesAtuais: LoteProduto[] = existente.lotes || [];
-  const indiceLoteExistente = encontrarIndiceLotePorValidade(
-    lotesAtuais,
-    validadeISO
-  );
-
+  const indiceLoteExistente = encontrarIndiceLotePorValidade(lotesAtuais, validadeISO);
   let novosLotes: LoteProduto[];
   let quantidadeTotalUnidades = existente.quantidade || 0;
   let quantidadeTotalKg = existente.quantidadeKg || 0;
 
   if (indiceLoteExistente >= 0) {
-    // Lote com mesma validade existe - SOMAR quantidade
     const loteExistente = lotesAtuais[indiceLoteExistente];
-    const novaQtdUnidades =
-      (loteExistente.quantidadeUnidades || 0) + quantidadeUnidades;
-    const novaQtdKg =
-      (loteExistente.quantidadeKg || 0) + (quantidadeKg || 0);
-
+    const novaQtdUnidades = (loteExistente.quantidadeUnidades || 0) + quantidadeUnidades;
+    const novaQtdKg = (loteExistente.quantidadeKg || 0) + (quantidadeKg || 0);
     lotesAtuais[indiceLoteExistente] = {
       ...loteExistente,
-      quantidadeUnidades:
-        novaQtdUnidades > 0 ? novaQtdUnidades : undefined,
+      quantidadeUnidades: novaQtdUnidades > 0 ? novaQtdUnidades : undefined,
       quantidadeKg: novaQtdKg > 0 ? novaQtdKg : undefined,
     };
     novosLotes = lotesAtuais;
     quantidadeTotalUnidades += quantidadeUnidades;
     quantidadeTotalKg += quantidadeKg || 0;
   } else {
-    // Novo lote com validade diferente - ADICIONAR à lista
     const novoLote: LoteProduto = {
       id: gerarIdLote(),
       validade: validadeISO,
-      quantidadeUnidades:
-        quantidadeUnidades > 0 ? quantidadeUnidades : undefined,
+      quantidadeUnidades: quantidadeUnidades > 0 ? quantidadeUnidades : undefined,
       quantidadeKg: quantidadeKg && quantidadeKg > 0 ? quantidadeKg : undefined,
       dataEntrada,
     };
@@ -339,11 +229,8 @@ export const adicionarLoteOuCriarProduto = async (params: {
     quantidadeTotalKg += quantidadeKg || 0;
   }
 
-  // Atualizar validade principal para a mais próxima
   const lotesOrdenados = ordenarLotesPorValidade(novosLotes);
-  const validadeMaisProxima = lotesOrdenados.find(
-    (l) => (l.quantidadeUnidades || 0) > 0
-  )?.validade;
+  const validadeMaisProxima = lotesOrdenados.find((l) => (l.quantidadeUnidades || 0) > 0)?.validade;
 
   const produtoRef = doc(db, "produtos", existente.id);
   const dadosAtualizados = removeUndefined({
@@ -351,34 +238,13 @@ export const adicionarLoteOuCriarProduto = async (params: {
     quantidadeKg: quantidadeTotalKg || undefined,
     validade: validadeMaisProxima,
     lotes: novosLotes,
-    codigoBarras:
-      codigoBarras?.trim() && !existente.codigoBarras
-        ? codigoBarras.trim()
-        : undefined,
-=======
-  const produtoRef = doc(db, "produtos", existente.id);
-  const lotesAtuais: LoteProduto[] = existente.lotes || [];
-
-  const quantidadeTotalUnidades =
-    (existente.quantidade || 0) + (quantidadeUnidades || 0);
-  const quantidadeTotalKg =
-    (existente.quantidadeKg || 0) + (quantidadeKg || 0);
-
-  const dadosAtualizados = removeUndefined({
-    quantidade: quantidadeTotalUnidades,
-    quantidadeKg: quantidadeTotalKg || undefined,
-    validade: validadeISO,
-    lotes: [...lotesAtuais, lote],
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
+    codigoBarras: codigoBarras?.trim() && !existente.codigoBarras ? codigoBarras.trim() : undefined,
   });
 
   await updateDoc(produtoRef, dadosAtualizados);
-
   return existente.id;
-<<<<<<< HEAD
 };
 
-// Tipos para saída FIFO
 export interface SaidaFIFOInput {
   produtoId: string;
   quantidadeUnidades?: number;
@@ -396,39 +262,27 @@ export interface SaidaFIFOResult {
   message: string;
 }
 
-// Saída de estoque com lógica FIFO automática
-export const saidaEstoqueFIFO = async (
-  input: SaidaFIFOInput
-): Promise<SaidaFIFOResult> => {
+export const saidaEstoqueFIFO = async (input: SaidaFIFOInput): Promise<SaidaFIFOResult> => {
   const { produtoId, quantidadeUnidades, quantidadeKg } = input;
-
   const produto = await getProduto(produtoId);
-  if (!produto) {
-    throw new Error("Produto não encontrado");
-  }
+  if (!produto) throw new Error("Produto não encontrado");
 
   const lotes = produto.lotes || [];
-  if (lotes.length === 0) {
-    throw new Error("Produto sem lotes cadastrados");
-  }
+  if (lotes.length === 0) throw new Error("Produto sem lotes");
 
-  // Ordenar por validade (mais próxima primeiro) - FIFO
   const lotesOrdenados = ordenarLotesPorValidade(lotes);
-
   let qtdUnidadesRemover = quantidadeUnidades || 0;
   let qtdKgRemover = quantidadeKg || 0;
   const lotesAfetados: SaidaFIFOResult["lotesAfetados"] = [];
-  let novosLotes: LoteProduto[] = [];
+  const novosLotes: LoteProduto[] = [];
 
   for (const lote of lotesOrdenados) {
     if (qtdUnidadesRemover <= 0 && qtdKgRemover <= 0) {
       novosLotes.push(lote);
       continue;
     }
-
     const qtdLoteUnidades = lote.quantidadeUnidades || 0;
     const qtdLoteKg = lote.quantidadeKg || 0;
-
     let removidoUnidades = 0;
     let removidoKg = 0;
     let restanteUnidades = qtdLoteUnidades;
@@ -439,13 +293,11 @@ export const saidaEstoqueFIFO = async (
       restanteUnidades = qtdLoteUnidades - removidoUnidades;
       qtdUnidadesRemover -= removidoUnidades;
     }
-
     if (qtdKgRemover > 0 && qtdLoteKg > 0) {
       removidoKg = Math.min(qtdKgRemover, qtdLoteKg);
       restanteKg = qtdLoteKg - removidoKg;
       qtdKgRemover -= removidoKg;
     }
-
     if (restanteUnidades > 0 || restanteKg > 0) {
       lotesAfetados.push({
         loteId: lote.id,
@@ -455,8 +307,7 @@ export const saidaEstoqueFIFO = async (
       });
       novosLotes.push({
         ...lote,
-        quantidadeUnidades:
-          restanteUnidades > 0 ? restanteUnidades : undefined,
+        quantidadeUnidades: restanteUnidades > 0 ? restanteUnidades : undefined,
         quantidadeKg: restanteKg > 0 ? restanteKg : undefined,
       });
     } else {
@@ -469,34 +320,16 @@ export const saidaEstoqueFIFO = async (
     }
   }
 
-  // Verificar se foi possível atender toda a solicitação
   if (qtdUnidadesRemover > 0 || qtdKgRemover > 0) {
-    const msg =
-      qtdUnidadesRemover > 0
-        ? `Estoque insuficiente. Faltam ${qtdUnidadesRemover} unidades`
-        : `Estoque insuficiente. Faltam ${qtdKgRemover} kg`;
+    const msg = qtdUnidadesRemover > 0 ? `Estoque insuficiente: faltam ${qtdUnidadesRemover} un` : `Estoque insuficiente: faltam ${qtdKgRemover} kg`;
     throw new Error(msg);
   }
 
-  // Calcular nova quantidade total
-  const novaQuantidadeTotal = novosLotes.reduce(
-    (acc, l) => acc + (l.quantidadeUnidades || 0),
-    0
-  );
-  const novaQuantidadeKgTotal = novosLotes.reduce(
-    (acc, l) => acc + (l.quantidadeKg || 0),
-    0
-  );
+  const novaQuantidadeTotal = novosLotes.reduce((acc, l) => acc + (l.quantidadeUnidades || 0), 0);
+  const novaQuantidadeKgTotal = novosLotes.reduce((acc, l) => acc + (l.quantidadeKg || 0), 0);
+  const lotesComEstoque = novosLotes.filter((l) => (l.quantidadeUnidades || 0) > 0 || (l.quantidadeKg || 0) > 0);
+  const validadeMaisProxima = lotesComEstoque.length > 0 ? ordenarLotesPorValidade(lotesComEstoque)[0].validade : undefined;
 
-  // Atualizar validade principal
-  const lotesComEstoque = novosLotes.filter(
-    (l) => (l.quantidadeUnidades || 0) > 0 || (l.quantidadeKg || 0) > 0
-  );
-  const validadeMaisProxima = lotesComEstoque.length > 0
-    ? ordenarLotesPorValidade(lotesComEstoque)[0].validade
-    : undefined;
-
-  // Salvar no Firestore
   const produtoRef = doc(db, "produtos", produtoId);
   await updateDoc(produtoRef, {
     quantidade: novaQuantidadeTotal,
@@ -505,32 +338,14 @@ export const saidaEstoqueFIFO = async (
     lotes: novosLotes,
   });
 
-  // Gerar mensagem de retorno
-  const lotesMsg = lotesAfetados
-    .map((l) => `${l.validade}: -${l.quantidadeRemovida}`)
-    .join(", ");
-
-  return {
-    sucesso: true,
-    lotesAfetados,
-    message: `Removido: ${lotesMsg}`,
-  };
+  const lotesMsg = lotesAfetados.map((l) => `${l.validade}: -${l.quantidadeRemovida}`).join(", ");
+  return { sucesso: true, lotesAfetados, message: `Removido: ${lotesMsg}` };
 };
 
-//getProdutos por nome (para autofill)
-export const buscarProdutosPorNome = async (
-  nome: string
-): Promise<Produto[]> => {
+export const buscarProdutosPorNome = async (nome: string): Promise<Produto[]> => {
   const userId = getCurrentUserId();
-  const produtosRef = collection(db, "produtos");
-  const q = query(
-    produtosRef,
-    where("userId", "==", userId),
-    where("nome", ">=", nome),
-    where("nome", "<=", nome + "\uf8ff")
-  );
+  if (!userId) return [];
+  const q = query(collection(db, "produtos"), where("userId", "==", userId), where("nome", ">=", nome), where("nome", "<=", nome + "\uf8ff"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Produto));
-=======
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
 };
