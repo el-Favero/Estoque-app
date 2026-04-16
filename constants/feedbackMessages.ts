@@ -6,6 +6,7 @@ export const FEEDBACK = {
     produtoAtualizado: 'Produto atualizado com sucesso.',
     movimentacaoRegistrada: 'Movimentação registrada com sucesso.',
     observacaoSalva: 'Observação salva com sucesso.',
+    importacaoSucesso: 'Produtos importados com sucesso.',
   },
   error: {
     generico: 'Não foi possível concluir a operação. Tente novamente.',
@@ -22,5 +23,6 @@ export const FEEDBACK = {
     registrarMovimentacao: 'Não foi possível registrar a movimentação.',
     salvarObservacao: 'Não foi possível salvar a observação.',
     camposObrigatoriosEdicao: 'Preencha os campos obrigatórios.',
+    importacaoErro: 'Erro ao importar produtos.',
   },
 } as const;

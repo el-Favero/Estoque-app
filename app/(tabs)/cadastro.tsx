@@ -7,20 +7,108 @@ import {
   Alert,
   TouchableOpacity,
   ActivityIndicator,
+  StyleSheet,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useEstoque } from "../../context/estoqueStorage";
 import { useTheme } from "../../context/ThemeContext";
 import { formatarDataInput } from "../../utils/validadeUtils";
 import { FEEDBACK } from "../../constants/feedbackMessages";
 import { toast } from "../../utils/toast";
 
+// Componente de Input moderno
+function ModernInput({ 
+  label, 
+  value, 
+  onChangeText, 
+  placeholder, 
+  keyboardType = 'default',
+  required = false,
+  icon,
+  multiline = false,
+  onIconPress,
+  maxLength,
+}: { 
+  label: string; 
+  value: string; 
+  onChangeText: (text: string) => void; 
+  placeholder?: string;
+  keyboardType?: 'default' | 'numeric' | 'number-pad';
+  required?: boolean;
+  icon?: string;
+  multiline?: boolean;
+  onIconPress?: () => void;
+  maxLength?: number;
+}) {
+  return (
+    <View style={styles.inputGroup}>
+      <View style={styles.inputLabelRow}>
+        <Text style={styles.inputLabel}>{label}</Text>
+        {required && <Text style={styles.required}>*obrigatório</Text>}
+      </View>
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={[styles.input, multiline && styles.inputMultiline]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="rgba(255,255,255,0.25)"
+          keyboardType={keyboardType}
+          multiline={multiline}
+          maxLength={maxLength}
+        />
+        {icon && (
+          <TouchableOpacity style={styles.inputIcon} onPress={onIconPress}>
+            <Ionicons name={icon as any} size={20} color="rgba(255,255,255,0.5)" />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// Componente de Toggle para tipo de quantidade
+function QuantityToggle({ 
+  label, 
+  value, 
+  onChangeText, 
+  unit,
+  placeholder,
+}: { 
+  label: string; 
+  value: string; 
+  onChangeText: (text: string) => void; 
+  unit: string;
+  placeholder: string;
+}) {
+  return (
+    <View style={styles.quantityBlock}>
+      <Text style={styles.quantityLabel}>{label}</Text>
+      <View style={styles.quantityInputContainer}>
+        <TextInput
+          style={styles.quantityInput}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="rgba(255,255,255,0.25)"
+          keyboardType="numeric"
+        />
+        <View style={styles.quantityUnit}>
+          <Text style={styles.quantityUnitText}>{unit}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function CadastroProduto() {
   const router = useRouter();
   const params = useLocalSearchParams<{ codigoBarras?: string | string[] }>();
-  const codigoParam = Array.isArray(params.codigoBarras)
-    ? params.codigoBarras[0]
-    : params.codigoBarras;
+  const codigoParam = Array.isArray(params.codigoBarras) ? params.codigoBarras[0] : params.codigoBarras;
 
   const { colors } = useTheme();
   const { cadastrarProdutoComLote } = useEstoque();
@@ -44,7 +132,7 @@ export default function CadastroProduto() {
 
   async function salvarProduto() {
     if (!nome.trim() || !categoria.trim() || !validade.trim()) {
-      Alert.alert("Erro", FEEDBACK.error.camposProduto);
+      Alert.alert("Ops!", "Preencha os campos obrigatórios");
       return;
     }
 
@@ -52,7 +140,7 @@ export default function CadastroProduto() {
     const kg = Number(quantidadeKg.replace(",", ".")) || 0;
 
     if (unidades <= 0 && kg <= 0) {
-      Alert.alert("Erro", FEEDBACK.error.quantidadeCadastro);
+      Alert.alert("Ops!", "Informe a quantidade (unidades ou kg)");
       return;
     }
 
@@ -67,8 +155,8 @@ export default function CadastroProduto() {
         quantidadeKg: kg > 0 ? kg : undefined,
         codigoBarras: codigoBarras.trim() || undefined,
       });
-      toast.success(FEEDBACK.success.produtoCadastrado);
-
+      toast.success("Produto cadastrado com sucesso!");
+      
       setNome("");
       setCategoria("");
       setValidade("");
@@ -78,335 +166,256 @@ export default function CadastroProduto() {
       setCodigoBarras("");
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "";
-      toast.error(
-        msg ? `${FEEDBACK.error.cadastrarProduto} ${msg}` : FEEDBACK.error.cadastrarProduto
-      );
+      toast.error(msg || "Erro ao cadastrar produto");
     } finally {
       setSalvando(false);
     }
   }
 
+  const temAlgumCampo = nome || categoria || validade || quantidadeUnidades || quantidadeKg || descricao || codigoBarras;
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ padding: 16 }}>
-        <View style={{ marginBottom: 20 }}>
-          <Text
-            style={{
-              fontSize: 28,
-              fontWeight: "bold",
-              color: colors.title,
-              textAlign: "center",
-            }}
-          >
-            Cadastrar Produto
-          </Text>
-          <Text
-            style={{
-              fontSize: 14,
-              color: colors.subtitle,
-              textAlign: "center",
-              marginTop: 4,
-            }}
-          >
-            Informe os dados básicos do insumo
-          </Text>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Novo Produto</Text>
+          <Text style={styles.subtitle}>Preencha os dados para cadastrar</Text>
         </View>
 
-        <View
-          style={{
-            backgroundColor: colors.card,
-            borderRadius: 16,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: colors.border,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 2,
-            marginBottom: 16,
-          }}
-        >
+        {/* Form Card */}
+        <View style={styles.formCard}>
           {/* Nome */}
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "600",
-              color: colors.title,
-              marginBottom: 6,
-            }}
-          >
-            Nome do produto <Text style={{ color: "#ef4444" }}>*</Text>
-          </Text>
-          <TextInput
-            style={{
-              backgroundColor: "#f8fafc",
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 10,
-              padding: 12,
-              fontSize: 15,
-              color: "#0f172a",
-              marginBottom: 8,
-            }}
-            placeholder="Ex.: Fubá, Frango, Óleo de soja..."
-            placeholderTextColor="#94a3b8"
+          <ModernInput
+            label="Nome do produto"
             value={nome}
             onChangeText={setNome}
+            placeholder="Ex.: Fubá, Frango, Óleo..."
+            required
+            icon="cube-outline"
           />
 
           {/* Categoria */}
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "600",
-              color: colors.title,
-              marginBottom: 6,
-              marginTop: 8,
-            }}
-          >
-            Categoria <Text style={{ color: "#ef4444" }}>*</Text>
-          </Text>
-          <TextInput
-            style={{
-              backgroundColor: "#f8fafc",
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 10,
-              padding: 12,
-              fontSize: 15,
-              color: "#0f172a",
-              marginBottom: 8,
-            }}
-            placeholder="Ex.: Grãos, Carnes, Limpeza..."
-            placeholderTextColor="#94a3b8"
+          <ModernInput
+            label="Categoria"
             value={categoria}
             onChangeText={setCategoria}
+            placeholder="Ex.: Grãos, Carnes, Limpeza..."
+            required
+            icon="pricetag-outline"
           />
 
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              marginTop: 8,
-            }}
-          >
-            <Text
-              style={{
-                flex: 1,
-                fontSize: 14,
-                fontWeight: "600",
-                color: colors.title,
-                marginBottom: 6,
-              }}
+          {/* Código de Barras */}
+          <View style={styles.codeRow}>
+            <View style={styles.codeInputWrapper}>
+              <ModernInput
+                label="Código de barras"
+                value={codigoBarras}
+                onChangeText={setCodigoBarras}
+                placeholder="EAN / código do produto"
+                icon="barcode-outline"
+              />
+            </View>
+            <TouchableOpacity 
+              style={styles.scanButton} 
+              onPress={() => router.push('/escanear')}
             >
-              Código de barras{" "}
-              <Text style={{ color: colors.subtitle, fontWeight: "400" }}>(opcional)</Text>
-            </Text>
-            <TouchableOpacity
-              onPress={() => router.push("/escanear")}
-              style={{
-                padding: 10,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.card,
-              }}
-            >
-              <Text style={{ fontSize: 18 }}>📷</Text>
+              <Ionicons name="camera-outline" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
-          <TextInput
-            style={{
-              backgroundColor: "#f8fafc",
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 10,
-              padding: 12,
-              fontSize: 15,
-              color: "#0f172a",
-              marginBottom: 8,
-            }}
-            placeholder="EAN / código do produto"
-            placeholderTextColor="#94a3b8"
-            value={codigoBarras}
-            onChangeText={setCodigoBarras}
-          />
 
           {/* Validade */}
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "600",
-              color: colors.title,
-              marginBottom: 6,
-              marginTop: 8,
-            }}
-          >
-            Validade <Text style={{ color: "#ef4444" }}>*</Text>
-          </Text>
-          <TextInput
-            style={{
-              backgroundColor: "#f8fafc",
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 10,
-              padding: 12,
-              fontSize: 15,
-              color: "#0f172a",
-              marginBottom: 8,
-            }}
-            placeholder="Digite a data assim: 01012026 (vira 01/01/2026)"
-            placeholderTextColor="#94a3b8"
-            keyboardType="number-pad"
-            maxLength={10}
+          <ModernInput
+            label="Data de validade"
             value={validade}
             onChangeText={handleChangeValidade}
+            placeholder="DD/MM/AAAA"
+            keyboardType="number-pad"
+            required
+            maxLength={10}
+            icon="calendar-outline"
           />
 
           {/* Quantidades */}
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "600",
-              color: colors.title,
-              marginBottom: 4,
-              marginTop: 12,
-            }}
-          >
-            Quantidade em estoque
-          </Text>
-          <Text
-            style={{
-              fontSize: 12,
-              color: colors.subtitle,
-              marginBottom: 8,
-            }}
-          >
-            Preencha pelo menos um dos campos abaixo. Você pode usar só
-            unidades, só kg ou os dois.
-          </Text>
+          <View style={styles.quantitySection}>
+            <Text style={styles.sectionTitle}>Quantidade em estoque</Text>
+            <Text style={styles.sectionHint}>Preencha ao menos um dos campos</Text>
+            
+            <View style={styles.quantityGrid}>
+              <QuantityToggle
+                label="Unidades"
+                value={quantidadeUnidades}
+                onChangeText={setQuantidadeUnidades}
+                unit="un"
+                placeholder="0"
+              />
+              <QuantityToggle
+                label="Peso (kg)"
+                value={quantidadeKg}
+                onChangeText={setQuantidadeKg}
+                unit="kg"
+                placeholder="0"
+              />
+            </View>
+          </View>
 
-          {/* Unidades */}
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: "500",
-              color: colors.title,
-              marginBottom: 4,
-            }}
-          >
-            Em unidades
-          </Text>
-          <TextInput
-            style={{
-              backgroundColor: "#f8fafc",
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 10,
-              padding: 12,
-              fontSize: 15,
-              color: "#0f172a",
-              marginBottom: 8,
-            }}
-            placeholder="Ex.: 50 (50 unidades desse produto)"
-            placeholderTextColor="#94a3b8"
-            keyboardType="numeric"
-            value={quantidadeUnidades}
-            onChangeText={setQuantidadeUnidades}
-          />
+          {/* Descrição */}
+          <View style={styles.inputGroup}>
+            <View style={styles.inputLabelRow}>
+              <Text style={styles.inputLabel}>Observações</Text>
+              <Text style={styles.optional}>opcional</Text>
+            </View>
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              value={descricao}
+              onChangeText={setDescricao}
+              placeholder="Anote detalhes importantes..."
+              placeholderTextColor="rgba(255,255,255,0.25)"
+              multiline
+              numberOfLines={3}
+            />
+          </View>
 
-          {/* Kg */}
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: "500",
-              color: colors.title,
-              marginBottom: 4,
-              marginTop: 4,
-            }}
-          >
-            Em kg
-          </Text>
-          <TextInput
-            style={{
-              backgroundColor: "#f8fafc",
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 10,
-              padding: 12,
-              fontSize: 15,
-              color: "#0f172a",
-              marginBottom: 8,
-            }}
-            placeholder="Ex.: 12,5 (12,5 kg desse produto)"
-            placeholderTextColor="#94a3b8"
-            keyboardType="numeric"
-            value={quantidadeKg}
-            onChangeText={setQuantidadeKg}
-          />
-
-          {/* Descrição opcional */}
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "600",
-              color: colors.title,
-              marginBottom: 4,
-              marginTop: 12,
-            }}
-          >
-            Observações{" "}
-            <Text
-              style={{
-                color: colors.subtitle,
-                fontSize: 12,
-                fontStyle: "italic",
-              }}
-            >
-              (opcional)
-            </Text>
-          </Text>
-          <TextInput
-            style={{
-              backgroundColor: "#f8fafc",
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 10,
-              padding: 12,
-              fontSize: 15,
-              color: "#0f172a",
-              marginBottom: 16,
-              minHeight: 60,
-            }}
-            placeholder="Anote qualquer detalhe importante sobre esse produto"
-            placeholderTextColor="#94a3b8"
-            multiline
-            value={descricao}
-            onChangeText={setDescricao}
-          />
-
-          <TouchableOpacity
+          {/* Botão salvar */}
+          <Pressable
             onPress={salvarProduto}
             disabled={salvando}
-            style={{
-              backgroundColor: salvando ? "#94a3b8" : "#4f46e5",
-              borderRadius: 12,
-              paddingVertical: 14,
-              alignItems: "center",
-            }}
+            style={({ pressed }) => [
+              styles.submitButton,
+              salvando && styles.submitButtonDisabled,
+              pressed && !salvando && styles.submitButtonPressed,
+            ]}
           >
             {salvando ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>
-                Salvar produto
-              </Text>
+              <>
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <Text style={styles.submitButtonText}>Salvar produto</Text>
+              </>
             )}
-          </TouchableOpacity>
+          </Pressable>
         </View>
-      </View>
-    </ScrollView>
+
+        {/* Dica */}
+        <View style={styles.tip}>
+          <Ionicons name="information-circle-outline" size={18} color="rgba(255,255,255,0.4)" />
+          <Text style={styles.tipText}>Campos com * são obrigatórios</Text>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0B1420' },
+  scrollView: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+  
+  header: { marginBottom: 24 },
+  title: { fontSize: 28, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  subtitle: { fontSize: 14, color: 'rgba(255,255,255,0.5)' },
+  
+  formCard: { 
+    backgroundColor: '#1A2332', 
+    borderRadius: 20, 
+    padding: 20, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  
+  inputGroup: { marginBottom: 20 },
+  inputLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  required: { fontSize: 11, color: 'rgba(255,255,255,0.4)' },
+  optional: { fontSize: 11, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' },
+  
+  inputContainer: { position: 'relative' },
+  input: { 
+    backgroundColor: '#0B1420', 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.1)', 
+    borderRadius: 12, 
+    paddingHorizontal: 14, 
+    paddingVertical: 14, 
+    color: '#fff',
+    fontSize: 15,
+  },
+  inputMultiline: { minHeight: 80, textAlignVertical: 'top', paddingTop: 14 },
+  inputIcon: { 
+    position: 'absolute', 
+    right: 14, 
+    top: 14, 
+    width: 24, 
+    height: 24, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  
+  codeRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  codeInputWrapper: { flex: 1 },
+  scanButton: { 
+    width: 52, 
+    height: 52, 
+    backgroundColor: '#378ADD', 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginTop: 24,
+  },
+  
+  quantitySection: { marginBottom: 24, paddingTop: 8 },
+  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#fff', marginBottom: 4 },
+  sectionHint: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 16 },
+  
+  quantityGrid: { flexDirection: 'row', gap: 12 },
+  quantityBlock: { flex: 1 },
+  quantityLabel: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 6 },
+  quantityInputContainer: { flexDirection: 'row', alignItems: 'center' },
+  quantityInput: { 
+    flex: 1,
+    backgroundColor: '#0B1420', 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.1)', 
+    borderRadius: 10, 
+    paddingHorizontal: 14, 
+    paddingVertical: 12, 
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  quantityUnit: { 
+    position: 'absolute', 
+    right: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)', 
+    paddingHorizontal: 10, 
+    paddingVertical: 6, 
+    borderRadius: 6 
+  },
+  quantityUnitText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '500' },
+  
+  submitButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 8,
+    backgroundColor: '#378ADD', 
+    borderRadius: 14, 
+    paddingVertical: 16,
+    marginTop: 8,
+  },
+  submitButtonDisabled: { backgroundColor: 'rgba(55,138,221,0.5)' },
+  submitButtonPressed: { backgroundColor: '#2d6cb5' },
+  submitButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  
+  tip: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20, justifyContent: 'center' },
+  tipText: { color: 'rgba(255,255,255,0.4)', fontSize: 13 },
+});

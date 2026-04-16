@@ -1,12 +1,9 @@
-<<<<<<< HEAD
 import { Produto } from "../../types/produto";
-=======
-import { Produto } from "../types/produto";
->>>>>>> 437f47a2a7013bf1d636952d8dfea79fe1203927
 
 export const produtos: Produto[] = [
   {
     id: "1",
+    userId: "mock-user-id",
     nome: "Arroz",
     categoria: "Secos",
     quantidade: 5,
@@ -15,6 +12,7 @@ export const produtos: Produto[] = [
   },
   {
     id: "2",
+    userId: "mock-user-id",
     nome: "Frango congelado",
     categoria: "Proteínas",
     quantidade: 1,

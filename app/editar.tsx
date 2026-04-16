@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TextInput, Button, Alert, ScrollView } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 
-import { carregarProdutos, salvarProdutos } from "@/services/ESTOQUE";
+import { getProduto, updateProduto } from "@/services/produtoService";
 import type { Produto } from "@/types/produto";
 
 export default function TelaEditar() {
@@ -17,11 +17,11 @@ export default function TelaEditar() {
   const [descricao, setDescricao] = useState("");
   const [validade, setValidade] = useState("");
 
-  // 🔹 Carregar produto
+  // Carregar produto
   useEffect(() => {
     async function carregar() {
-      const lista = await carregarProdutos();
-      const encontrado = lista.find(p => p.id === id);
+      if (!id) return;
+      const encontrado = await getProduto(id);
 
       if (!encontrado) {
         Alert.alert("Erro", "Produto não encontrado");
@@ -60,23 +60,14 @@ export default function TelaEditar() {
     }
 
     try {
-      const listaAtual = await carregarProdutos();
-
-      const novaLista = listaAtual.map(p =>
-        p.id === produto.id
-          ? {
-              ...p,
-              nome,
-              quantidade: qtd,
-              minimo: min,
-              categoria,
-              descricao: descricao || undefined,
-              validade: validade || undefined,
-            }
-          : p
-      );
-
-      await salvarProdutos(novaLista);
+      await updateProduto(id!, {
+        nome,
+        quantidade: qtd,
+        minimo: min,
+        categoria,
+        descricao: descricao || undefined,
+        validade: validade || undefined,
+      });
 
       Alert.alert("Sucesso", "Produto atualizado!");
 

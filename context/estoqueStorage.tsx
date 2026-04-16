@@ -109,19 +109,36 @@ export const EstoqueProvider = ({ children }: { children: React.ReactNode }) => 
 
   const adicionarProduto = async (produto: Omit<Produto, 'id'>) => {
     const id = await createProduto(produto);
-    await carregarProdutos({ showLoading: false });
+    // Atualiza estado local diretamente - sem refetch
+    const novoProduto = { ...produto, id, userId: produto.userId || '' } as Produto;
+    setProdutos((prev) => [...prev, novoProduto]);
     return id;
   };
 
   const cadastrarProdutoComLote = async (params: CadastroLoteParams) => {
     const id = await adicionarLoteOuCriarProdutoService(params);
-    await carregarProdutos({ showLoading: false });
+    // Atualiza estado local - busca apenas o produto criado
+    try {
+      const { getProduto } = await import('../services/produtoService');
+      const novoProduto = await getProduto(id);
+      if (novoProduto) {
+        setProdutos((prev) => {
+          const exists = prev.some(p => p.id === id);
+          if (exists) return prev;
+          return [...prev, novoProduto];
+        });
+      }
+    } catch (e) {
+      // Se falhar, faz refetch completo
+      await carregarProdutos({ showLoading: false });
+    }
     return id;
   };
 
   const editarProduto = async (id: string, updates: Partial<Omit<Produto, 'id'>>) => {
     try {
       await updateProduto(id, updates);
+      // Atualiza estado local diretamente - sem refetch
       setProdutos((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
     } catch (error) {
       console.error('Erro ao editar produto:', error);
@@ -132,6 +149,7 @@ export const EstoqueProvider = ({ children }: { children: React.ReactNode }) => 
   const removerProduto = async (id: string) => {
     try {
       await deleteProduto(id);
+      // Atualiza estado local diretamente - sem refetch
       setProdutos((prev) => prev.filter((p) => p.id !== id));
     } catch (error) {
       console.error('Erro ao remover produto:', error);
@@ -142,10 +160,26 @@ export const EstoqueProvider = ({ children }: { children: React.ReactNode }) => 
   const registrarMovimentacao = async (data: MovimentacaoInput) => {
     try {
       const movimentacaoId = await registrarMovimentacaoService(data);
-      await Promise.all([
-        carregarProdutos({ showLoading: false }),
-        carregarMovimentacoes({ showLoading: false }),
-      ]);
+      
+      // Atualiza movimentações localmente
+      const { getTodasMovimentacoes } = await import('../services/movimentacao/movimentacaoServices');
+      const novasMovimentacoes = await getTodasMovimentacoes();
+      setMovimentacoes(novasMovimentacoes);
+      
+      // Atualiza produtos localmente - busca apenas o produto afetado
+      try {
+        const { getProduto } = await import('../services/produtoService');
+        const produtoAtualizado = await getProduto(data.produtoId);
+        if (produtoAtualizado) {
+          setProdutos((prev) => prev.map((p) => 
+            p.id === data.produtoId ? produtoAtualizado : p
+          ));
+        }
+      } catch (e) {
+        // Se falhar, faz refetch completo
+        await carregarProdutos({ showLoading: false });
+      }
+      
       return movimentacaoId;
     } catch (error) {
       console.error('Erro no contexto ao registrar movimentação:', error);

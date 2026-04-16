@@ -6,11 +6,10 @@ import {
   signOut,
   onAuthStateChanged,
   User,
-  signInWithPopup,
-  GoogleAuthProvider,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { auth, googleProvider } from '../src/firebaseConfig';
+import * as WebBrowser from 'expo-web-browser';
+import { auth } from '../src/firebaseConfig';
 
 interface AuthContextType {
   user: User | null;
@@ -19,7 +18,6 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  /** Envia e-mail do Firebase para redefinir senha (conta e-mail/senha). */
   enviarRedefinicaoSenha: (email: string) => Promise<void>;
 }
 
@@ -39,29 +37,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log("AuthContext signIn...", email);
     await signInWithEmailAndPassword(auth, email, password);
-    console.log("AuthContext signIn OK");
   };
 
   const signUp = async (email: string, password: string) => {
-    console.log("AuthContext signUp...", email);
     await createUserWithEmailAndPassword(auth, email, password);
-    console.log("AuthContext signUp OK");
   };
 
+  // Login com Google via WebBrowser
+  // Abre uma sessão de autenticação no browser do sistema
   const signInWithGoogle = async () => {
-    console.log("AuthContext signInWithGoogle...");
-    await signInWithPopup(auth, googleProvider);
-    console.log("AuthContext signInWithGoogle OK");
+    // URL de autenticação do Firebase (configurada no Console Firebase)
+    // Você precisa adicionar seu app às "Authorized domains" no Firebase Console
+    const authUrl = 'https://appestoque-b0d21.firebaseapp.com/__/auth/handler';
+    
+    const result = await WebBrowser.openAuthSessionAsync(
+      authUrl,
+      'meuestoqueapp://'
+    );
+
+    if (result.type === 'success') {
+      // O Firebase Auth vai detectar a sessão e atualizar o estado
+      console.log("Google auth successful");
+    } else if (result.type === 'cancel') {
+      console.log("Usuário cancelou login Google");
+    } else {
+      throw new Error("Falha na autenticação Google");
+    }
   };
 
   const logout = async () => {
-    console.log("Fazendo logout...");
     try {
       await signOut(auth);
       setUser(null);
-      console.log("Logout feito!");
     } catch (error) {
       console.error("Erro no logout:", error);
     }

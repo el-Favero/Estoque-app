@@ -2,8 +2,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { MovimentacaoInput } from '../../services/movimentacao/types'; 
 import {
-  Alert,
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -13,35 +13,148 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useEstoque } from '../../context/estoqueStorage';
 import { useTheme } from '../../context/ThemeContext';
 import { FEEDBACK } from '../../constants/feedbackMessages';
 import { toast } from '../../utils/toast';
 import { Produto } from '../../types/produto';
 
+// Estilos definidos fora para evitar erro de referência
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0B1420' },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 },
+  
+  header: { marginBottom: 24 },
+  title: { fontSize: 28, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  subtitle: { fontSize: 14, color: 'rgba(255,255,255,0.5)' },
+  
+  toggleContainer: { flexDirection: 'row', backgroundColor: '#1A2332', borderRadius: 14, padding: 4, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  toggleButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 10 },
+  toggleButtonAtivo: { backgroundColor: '#ef4444' },
+  toggleButtonAtivoRetorno: { backgroundColor: '#22c55e' },
+  toggleText: { fontSize: 15, fontWeight: '600', color: 'rgba(255,255,255,0.5)' },
+  toggleTextAtivo: { color: '#fff' },
+  
+  card: { backgroundColor: '#1A2332', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', marginBottom: 16 },
+  
+  label: { fontSize: 14, fontWeight: '600', color: '#fff', marginBottom: 8 },
+  input: { backgroundColor: '#0B1420', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14, color: '#fff', fontSize: 15 },
+  
+  row: { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 16 },
+  inputFlex: { flex: 1, backgroundColor: '#0B1420', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14, color: '#fff', fontSize: 16, fontWeight: '600' },
+  unitBadge: { backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 14, paddingVertical: 14, borderRadius: 12 },
+  unitBadgeText: { color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '600' },
+  
+  produtoSelector: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  produtoInputWrapper: { flex: 1 },
+  scanButton: { width: 52, height: 52, backgroundColor: '#378ADD', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  
+  produtoInfo: { backgroundColor: 'rgba(55,138,221,0.1)', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(55,138,221,0.2)' },
+  produtoInfoHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  produtoInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: 'rgba(55,138,221,0.2)', alignItems: 'center', justifyContent: 'center' },
+  produtoInfoNome: { fontSize: 16, fontWeight: '600', color: '#fff', flex: 1 },
+  produtoInfoEstoque: { fontSize: 13, color: 'rgba(255,255,255,0.5)' },
+  produtoInfoRemove: { padding: 4 },
+  
+  hint: { textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 8, marginBottom: 16 },
+  
+  submitButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: 14, marginTop: 8 },
+  submitButtonRetirada: { backgroundColor: '#ef4444' },
+  submitButtonRetorno: { backgroundColor: '#22c55e' },
+  submitButtonDisabled: { opacity: 0.6 },
+  submitButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#1A2332', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '85%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
+  closeButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0B1420', borderRadius: 12, paddingHorizontal: 14, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, paddingVertical: 14, color: '#fff', fontSize: 15 },
+  
+  produtoItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  produtoItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  produtoItemIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: 'rgba(55,138,221,0.15)', alignItems: 'center', justifyContent: 'center' },
+  produtoItemNome: { fontSize: 15, fontWeight: '600', color: '#fff', marginBottom: 2 },
+  produtoItemCategoria: { fontSize: 12, color: 'rgba(255,255,255,0.5)' },
+  produtoItemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  produtoItemQtd: { fontSize: 13, color: 'rgba(255,255,255,0.5)' },
+});
+
+// Toggle moderno para tipo de movimentação
+function TipoToggle({ tipo, onChange }: { tipo: 'retirada' | 'retorno'; onChange: (t: 'retirada' | 'retorno') => void }) {
+  return (
+    <View style={styles.toggleContainer}>
+      <Pressable 
+        style={[styles.toggleButton, tipo === 'retirada' && styles.toggleButtonAtivo]}
+        onPress={() => onChange('retirada')}
+      >
+        <Ionicons 
+          name="arrow-up-circle-outline" 
+          size={18} 
+          color={tipo === 'retirada' ? '#fff' : 'rgba(255,255,255,0.5)'} 
+        />
+        <Text style={[styles.toggleText, tipo === 'retirada' && styles.toggleTextAtivo]}>Retirada</Text>
+      </Pressable>
+      <Pressable 
+        style={[styles.toggleButton, tipo === 'retorno' && styles.toggleButtonAtivoRetorno]}
+        onPress={() => onChange('retorno')}
+      >
+        <Ionicons 
+          name="arrow-down-circle-outline" 
+          size={18} 
+          color={tipo === 'retorno' ? '#fff' : 'rgba(255,255,255,0.5)'} 
+        />
+        <Text style={[styles.toggleText, tipo === 'retorno' && styles.toggleTextAtivo]}>Retorno</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// Card de produto no modal
+function ProdutoItem({ produto, onSelect }: { produto: Produto; onSelect: () => void }) {
+  return (
+    <Pressable 
+      style={styles.produtoItem} 
+      onPress={onSelect}
+    >
+      <View style={styles.produtoItemLeft}>
+        <View style={styles.produtoItemIcon}>
+          <Ionicons name="cube-outline" size={16} color="#378ADD" />
+        </View>
+        <View>
+          <Text style={styles.produtoItemNome}>{produto.nome}</Text>
+          <Text style={styles.produtoItemCategoria}>{produto.categoria}</Text>
+        </View>
+      </View>
+      <View style={styles.produtoItemRight}>
+        <Text style={styles.produtoItemQtd}>{produto.quantidade} un</Text>
+        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />
+      </View>
+    </Pressable>
+  );
+}
+
 export default function Movimentacao() {
   const router = useRouter();
   const params = useLocalSearchParams<{ selecionarProdutoId?: string | string[] }>();
-  const selecionarId = Array.isArray(params.selecionarProdutoId)
-    ? params.selecionarProdutoId[0]
-    : params.selecionarProdutoId;
+  const selecionarId = Array.isArray(params.selecionarProdutoId) ? params.selecionarProdutoId[0] : params.selecionarProdutoId;
 
   const { colors } = useTheme();
-  const {
-    produtos,
-    registrarMovimentacao,
-    produtosLoading,
-    carregarProdutos,
-    carregarMovimentacoes,
-  } = useEstoque();
+  const { produtos, registrarMovimentacao, produtosLoading, carregarProdutos, carregarMovimentacoes } = useEstoque();
   
   const [tipo, setTipo] = useState<'retirada' | 'retorno'>('retirada');
   const [buscaProduto, setBuscaProduto] = useState('');
   const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  
   const [quantidadeUnidades, setQuantidadeUnidades] = useState('');
   const [quantidadeKg, setQuantidadeKg] = useState('');
   const [finalidade, setFinalidade] = useState('');
@@ -60,16 +173,12 @@ export default function Movimentacao() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        carregarProdutos({ showLoading: false }),
-        carregarMovimentacoes({ showLoading: false }),
-      ]);
+      await Promise.all([carregarProdutos({ showLoading: false }), carregarMovimentacoes({ showLoading: false })]);
     } finally {
       setRefreshing(false);
     }
   }, [carregarProdutos, carregarMovimentacoes]);
 
-  // Filtrar produtos
   const produtosFiltrados = useMemo(() => {
     if (!produtos || !produtos.length) return [];
     if (!buscaProduto.trim()) return produtos;
@@ -91,7 +200,7 @@ export default function Movimentacao() {
     setSalvando(true);
     try {
       await registrarMovimentacao(movimentacaoData);
-      toast.success(FEEDBACK.success.movimentacaoRegistrada);
+      toast.success('Movimentação registrada com sucesso!');
       setQuantidadeUnidades('');
       setQuantidadeKg('');
       setFinalidade('');
@@ -99,7 +208,7 @@ export default function Movimentacao() {
       setBuscaProduto('');
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : '';
-      toast.error(msg || FEEDBACK.error.registrarMovimentacao);
+      toast.error(msg || 'Erro ao registrar movimentação');
     } finally {
       setSalvando(false);
     }
@@ -107,7 +216,7 @@ export default function Movimentacao() {
 
   const handleConfirmar = () => {
     if (!produtoSelecionado) {
-      toast.error(FEEDBACK.error.selecionarProduto);
+      toast.error('Selecione um produto');
       return;
     }
 
@@ -115,22 +224,22 @@ export default function Movimentacao() {
     const temKg = quantidadeKg.trim() !== '';
 
     if (!temUnidades && !temKg) {
-      toast.error(FEEDBACK.error.quantidadeMovimentacao);
+      toast.error('Informe a quantidade');
       return;
     }
 
     if (temUnidades && (!/^\d+$/.test(quantidadeUnidades) || Number(quantidadeUnidades) <= 0)) {
-      toast.error(FEEDBACK.error.unidadesInteiras);
+      toast.error('Informe um número válido de unidades');
       return;
     }
 
     if (temKg && (!/^\d*\.?\d+$/.test(quantidadeKg) || Number(quantidadeKg) <= 0)) {
-      toast.error(FEEDBACK.error.kgValido);
+      toast.error('Informe um valor válido em kg');
       return;
     }
 
     if (tipo === 'retirada' && !finalidade.trim()) {
-      toast.error(FEEDBACK.error.finalidadeRetirada);
+      toast.error('Informe a finalidade');
       return;
     }
 
@@ -139,18 +248,11 @@ export default function Movimentacao() {
 
     if (tipo === 'retirada') {
       if (unidades > produtoSelecionado.quantidade) {
-        Alert.alert(
-          'Estoque insuficiente',
-          `Disponível: ${produtoSelecionado.quantidade} unidades`
-        );
+        toast.error(`Estoque insuficiente: ${produtoSelecionado.quantidade} un`);
         return;
       }
-
       if (produtoSelecionado.quantidadeKg && kg > produtoSelecionado.quantidadeKg) {
-        Alert.alert(
-          'Estoque insuficiente',
-          `Disponível: ${produtoSelecionado.quantidadeKg} kg`
-        );
+        toast.error(`Estoque insuficiente: ${produtoSelecionado.quantidadeKg} kg`);
         return;
       }
     }
@@ -167,420 +269,181 @@ export default function Movimentacao() {
     const resumoKg = temKg ? `${kg} kg` : '';
     const resumoQtd = [resumoUn, resumoKg].filter(Boolean).join(' + ');
     const acao = tipo === 'retirada' ? 'Retirada' : 'Retorno';
-    const msgConfirm = `${acao}: ${produtoSelecionado.nome}\nQuantidade: ${resumoQtd}${
-      tipo === 'retirada' ? `\nFinalidade: ${finalidade.trim()}` : ''
-    }`;
 
-    Alert.alert('Confirmar movimentação', msgConfirm, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Confirmar',
-        onPress: () => {
-          void executarMovimentacao(movimentacaoData);
-        },
-      },
-    ]);
+    Alert.alert(
+      'Confirmar movimentação',
+      `${acao}: ${produtoSelecionado.nome}\nQuantidade: ${resumoQtd}${tipo === 'retirada' ? `\nFinalidade: ${finalidade.trim()}` : ''}`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', onPress: () => void executarMovimentacao(movimentacaoData) },
+      ]
+    );
   };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollContent: {
-      padding: 16,
-    },
-    header: {
-      marginBottom: 20,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: colors.title,
-      textAlign: 'center',
-    },
-    subtitle: {
-      fontSize: 14,
-      color: colors.subtitle,
-      textAlign: 'center',
-      marginTop: 4,
-    },
-    toggleContainer: {
-      flexDirection: 'row',
-      backgroundColor: colors.card,
-      borderRadius: 30,
-      padding: 4,
-      borderWidth: 1,
-      borderColor: colors.border,
-      marginBottom: 16,
-    },
-    toggleButton: {
-      flex: 1,
-      paddingVertical: 12,
-      borderRadius: 26,
-      alignItems: 'center',
-    },
-    toggleButtonAtivo: {
-      backgroundColor: colors.icon,
-    },
-    toggleText: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    toggleTextAtivo: {
-      color: '#fff',
-    },
-    card: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
-      elevation: 2,
-      marginBottom: 16,
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.title,
-      marginBottom: 6,
-      marginTop: 8,
-    },
-    input: {
-      backgroundColor: '#f8fafc',
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 10,
-      padding: 12,
-      fontSize: 15,
-      color: '#0f172a',
-      marginBottom: 4,
-    },
-    row: {
-      flexDirection: 'row',
-      gap: 8,
-      alignItems: 'center',
-    },
-    inputFlex: {
-      flex: 1,
-      backgroundColor: '#f8fafc',
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 10,
-      padding: 12,
-      fontSize: 15,
-      color: '#0f172a',
-    },
-    badge: {
-      backgroundColor: colors.border,
-      paddingHorizontal: 12,
-      paddingVertical: 12,
-      borderRadius: 10,
-    },
-    badgeText: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: colors.title,
-    },
-    produtoInfo: {
-      backgroundColor: '#f8fafc',
-      borderRadius: 10,
-      padding: 12,
-      marginBottom: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    produtoNome: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.title,
-    },
-    produtoEstoque: {
-      fontSize: 14,
-      color: colors.subtitle,
-      marginTop: 4,
-    },
-    button: {
-      backgroundColor: colors.icon,
-      borderRadius: 12,
-      padding: 16,
-      alignItems: 'center',
-      marginTop: 16,
-    },
-    buttonText: {
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: '700',
-    },
-    buttonDisabled: {
-      opacity: 0.65,
-    },
-    buttonRetirada: {
-      backgroundColor: '#ef4444',
-    },
-    buttonRetorno: {
-      backgroundColor: '#22c55e',
-    },
-    // Modal
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'flex-end',
-    },
-    modalContent: {
-      backgroundColor: colors.card,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      padding: 16,
-      maxHeight: '80%',
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16,
-    },
-    modalTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: colors.title,
-    },
-    closeButton: {
-      padding: 8,
-    },
-    closeButtonText: {
-      fontSize: 18,
-      color: colors.subtitle,
-    },
-    produtoItem: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    produtoItemNome: {
-      fontSize: 15,
-      fontWeight: '500',
-      color: colors.text,
-      flex: 1,
-    },
-    produtoItemInfo: {
-      fontSize: 13,
-      color: colors.subtitle,
-      marginRight: 8,
-    },
-    scanIconBtn: {
-      padding: 8,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-    },
-  });
-
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[colors.icon]}
-            tintColor={colors.icon}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#378ADD']} tintColor="#378ADD" />
         }
       >
         <View style={styles.header}>
-          <Text style={styles.title}>
-            {tipo === 'retirada' ? '📤 Retirada' : '📥 Retorno'}
-          </Text>
-          <Text style={styles.subtitle}>
-            Registre a saída ou entrada de produtos
-          </Text>
+          <Text style={styles.title}>Movimentação</Text>
+          <Text style={styles.subtitle}>{tipo === 'retirada' ? 'Registre a saída de produtos' : 'Registre a entrada de produtos'}</Text>
         </View>
 
-        {/* Alternância */}
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[styles.toggleButton, tipo === 'retirada' && styles.toggleButtonAtivo]}
-            onPress={() => setTipo('retirada')}
-          >
-            <Text style={[styles.toggleText, tipo === 'retirada' && styles.toggleTextAtivo]}>
-              Retirada
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleButton, tipo === 'retorno' && styles.toggleButtonAtivo]}
-            onPress={() => setTipo('retorno')}
-          >
-            <Text style={[styles.toggleText, tipo === 'retorno' && styles.toggleTextAtivo]}>
-              Retorno
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TipoToggle tipo={tipo} onChange={setTipo} />
 
         <View style={styles.card}>
-          {/* Seleção de Produto */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={[styles.label, { flex: 1, marginTop: 0 }]}>Produto *</Text>
-            <TouchableOpacity
-              style={styles.scanIconBtn}
-              onPress={() =>
-                router.push({ pathname: '/escanear', params: { returnTo: 'movimentacao' } })
-              }
-            >
-              <Text style={{ fontSize: 18 }}>📷</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity onPress={() => setModalVisible(true)}>
-            <View pointerEvents="none">
-              <TextInput
-                style={styles.input}
-                placeholder="Toque para buscar um produto..."
-                placeholderTextColor="#94a3b8"
-                value={buscaProduto}
-                onChangeText={setBuscaProduto}
-                onFocus={() => setModalVisible(true)}
-              />
+          <View style={styles.produtoSelector}>
+            <View style={styles.produtoInputWrapper}>
+              <Text style={styles.label}>Produto</Text>
+              <Pressable onPress={() => setModalVisible(true)}>
+                <View pointerEvents="none">
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Toque para buscar..."
+                    placeholderTextColor="rgba(255,255,255,0.25)"
+                    value={buscaProduto}
+                    onChangeText={setBuscaProduto}
+                    onFocus={() => setModalVisible(true)}
+                  />
+                </View>
+              </Pressable>
             </View>
-          </TouchableOpacity>
+            <Pressable style={styles.scanButton} onPress={() => router.push({ pathname: '/escanear', params: { returnTo: 'movimentacao' } })}>
+              <Ionicons name="camera-outline" size={22} color="#fff" />
+            </Pressable>
+          </View>
 
-          {/* Info do Produto Selecionado */}
           {produtoSelecionado && (
             <View style={styles.produtoInfo}>
-              <Text style={styles.produtoNome}>{produtoSelecionado.nome}</Text>
-              <Text style={styles.produtoEstoque}>
+              <View style={styles.produtoInfoHeader}>
+                <View style={styles.produtoInfoIcon}>
+                  <Ionicons name="cube" size={16} color="#378ADD" />
+                </View>
+                <Text style={styles.produtoInfoNome}>{produtoSelecionado.nome}</Text>
+                <Pressable style={styles.produtoInfoRemove} onPress={() => { setProdutoSelecionado(null); setBuscaProduto(''); }}>
+                  <Ionicons name="close-circle" size={20} color="rgba(255,255,255,0.3)" />
+                </Pressable>
+              </View>
+              <Text style={styles.produtoInfoEstoque}>
                 Estoque: {produtoSelecionado.quantidade} un
                 {produtoSelecionado.quantidadeKg ? ` / ${produtoSelecionado.quantidadeKg} kg` : ''}
               </Text>
             </View>
           )}
 
-          {/* Unidades */}
-          <Text style={styles.label}>Unidades (opcional)</Text>
+          <Text style={styles.label}>Quantidade em unidades</Text>
           <View style={styles.row}>
             <TextInput
               style={styles.inputFlex}
-              placeholder="Ex.: 5"
-              placeholderTextColor="#94a3b8"
+              placeholder="0"
+              placeholderTextColor="rgba(255,255,255,0.25)"
               keyboardType="numeric"
               value={quantidadeUnidades}
               onChangeText={setQuantidadeUnidades}
             />
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>un</Text>
+            <View style={styles.unitBadge}>
+              <Text style={styles.unitBadgeText}>un</Text>
             </View>
           </View>
 
-          {/* KG */}
-          <Text style={[styles.label, { marginTop: 12 }]}>Peso (kg) - opcional</Text>
+          <Text style={styles.label}>Quantidade em kg</Text>
           <View style={styles.row}>
             <TextInput
               style={styles.inputFlex}
-              placeholder="Ex.: 2.5"
-              placeholderTextColor="#94a3b8"
+              placeholder="0"
+              placeholderTextColor="rgba(255,255,255,0.25)"
               keyboardType="numeric"
               value={quantidadeKg}
               onChangeText={setQuantidadeKg}
             />
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>kg</Text>
+            <View style={styles.unitBadge}>
+              <Text style={styles.unitBadgeText}>kg</Text>
             </View>
           </View>
 
-          <Text style={{ color: colors.subtitle, fontSize: 12, textAlign: 'center', marginTop: 8 }}>
-            Preencha pelo menos um dos campos acima
-          </Text>
+          <Text style={styles.hint}>Preencha ao menos um dos campos acima</Text>
 
-          {/* Finalidade (só para retirada) */}
           {tipo === 'retirada' && (
             <>
-              <Text style={[styles.label, { marginTop: 16 }]}>Finalidade *</Text>
+              <Text style={styles.label}>Finalidade</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Ex.: Polenta, Doação, Venda..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="rgba(255,255,255,0.25)"
                 value={finalidade}
                 onChangeText={setFinalidade}
               />
             </>
           )}
 
-          <TouchableOpacity 
+          <Pressable
             style={[
-              styles.button, 
-              tipo === 'retirada' ? styles.buttonRetirada : styles.buttonRetorno,
-              salvando && styles.buttonDisabled,
-            ]} 
+              styles.submitButton,
+              tipo === 'retirada' ? styles.submitButtonRetirada : styles.submitButtonRetorno,
+              salvando && styles.submitButtonDisabled,
+            ]}
             onPress={handleConfirmar}
             disabled={salvando}
           >
             {salvando ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>
-                {tipo === 'retirada' ? 'Confirmar Retirada' : 'Confirmar Retorno'}
-              </Text>
+              <>
+                <Ionicons name={tipo === 'retirada' ? 'arrow-up-circle' : 'arrow-down-circle'} size={20} color="#fff" />
+                <Text style={styles.submitButtonText}>
+                  {tipo === 'retirada' ? 'Confirmar Retirada' : 'Confirmar Retorno'}
+                </Text>
+              </>
             )}
-          </TouchableOpacity>
+          </Pressable>
         </View>
-
-        <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* Modal de busca */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Selecionar Produto</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
+              <Pressable onPress={() => setModalVisible(false)} style={styles.closeButton}>
+                <Ionicons name="close" size={18} color="#fff" />
+              </Pressable>
             </View>
 
-            <TextInput
-              style={[styles.input, { marginBottom: 12 }]}
-              placeholder="Buscar produto..."
-              placeholderTextColor="#94a3b8"
-              value={buscaProduto}
-              onChangeText={setBuscaProduto}
-              autoFocus
-            />
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={18} color="rgba(255,255,255,0.4)" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar produto..."
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={buscaProduto}
+                onChangeText={setBuscaProduto}
+                autoFocus
+              />
+            </View>
 
             {produtosLoading && produtos.length === 0 ? (
-              <View style={{ padding: 24, alignItems: 'center' }}>
-                <ActivityIndicator color={colors.icon} />
-                <Text style={{ marginTop: 8, color: colors.subtitle }}>Carregando produtos…</Text>
+              <View style={{ padding: 32, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#378ADD" />
               </View>
             ) : (
               <FlatList
                 data={produtosFiltrados}
                 keyExtractor={(item) => item.id}
                 ListEmptyComponent={
-                  <Text style={{ textAlign: 'center', color: colors.subtitle, padding: 16 }}>
-                    Nenhum produto cadastrado. Cadastre um produto antes de movimentar.
+                  <Text style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', padding: 24 }}>
+                    Nenhum produto encontrado
                   </Text>
                 }
                 renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.produtoItem}
-                    onPress={() => handleSelecionarProduto(item)}
-                  >
-                    <Text style={styles.produtoItemNome}>{item.nome}</Text>
-                    <Text style={styles.produtoItemInfo}>
-                      {item.quantidade} un
-                    </Text>
-                  </TouchableOpacity>
+                  <ProdutoItem produto={item} onSelect={() => handleSelecionarProduto(item)} />
                 )}
                 showsVerticalScrollIndicator={false}
               />
@@ -588,6 +451,6 @@ export default function Movimentacao() {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

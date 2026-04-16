@@ -9,6 +9,7 @@ import {
   deleteDoc,
   query,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { Produto, LoteProduto } from "../types/produto";
 import { validadeParaISO } from "../utils/validadeUtils";
@@ -348,4 +349,94 @@ export const buscarProdutosPorNome = async (nome: string): Promise<Produto[]> =>
   const q = query(collection(db, "produtos"), where("userId", "==", userId), where("nome", ">=", nome), where("nome", "<=", nome + "\uf8ff"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Produto));
+};
+
+export interface ProdutoCSV {
+  nome: string;
+  categoria: string;
+  validade: string;
+  quantidadeUnidades?: number;
+  quantidadeKg?: number;
+  codigoBarras?: string;
+  descricao?: string;
+}
+
+export interface ImportacaoResultado {
+  sucesso: number;
+  erros: { linha: number; erro: string }[];
+}
+
+export const importarProdutosEmMassa = async (
+  produtos: ProdutoCSV[]
+): Promise<ImportacaoResultado> => {
+  const userId = getCurrentUserId();
+  if (!userId) {
+    throw new Error("Usuário não está logado");
+  }
+
+  const batch = writeBatch(db);
+  let sucesso = 0;
+  const erros: { linha: number; erro: string }[] = [];
+  const dataEntrada = new Date().toISOString();
+
+  for (let i = 0; i < produtos.length; i++) {
+    const p = produtos[i];
+    const linha = i + 1;
+
+    if (!p.nome?.trim()) {
+      erros.push({ linha, erro: "Nome vazio" });
+      continue;
+    }
+    if (!p.categoria?.trim()) {
+      erros.push({ linha, erro: "Categoria vazia" });
+      continue;
+    }
+    if (!p.validade?.trim()) {
+      erros.push({ linha, erro: "Validade vazia" });
+      continue;
+    }
+
+    const validadeISO = validadeParaISO(p.validade);
+    if (!validadeISO) {
+      erros.push({ linha, erro: "Validade inválida" });
+      continue;
+    }
+
+    const qtdUnidades = p.quantidadeUnidades ?? 0;
+    const qtdKg = p.quantidadeKg ?? 0;
+    if (qtdUnidades <= 0 && qtdKg <= 0) {
+      erros.push({ linha, erro: "Quantidade inválida" });
+      continue;
+    }
+
+    const novoLote: LoteProduto = {
+      id: gerarIdLote(),
+      validade: validadeISO,
+      quantidadeUnidades: qtdUnidades > 0 ? qtdUnidades : undefined,
+      quantidadeKg: qtdKg > 0 ? qtdKg : undefined,
+      dataEntrada,
+    };
+
+    const novoProduto: Omit<Produto, "id"> = {
+      userId,
+      nome: p.nome.trim(),
+      categoria: p.categoria.trim(),
+      descricao: p.descricao?.trim(),
+      quantidade: qtdUnidades,
+      quantidadeKg: qtdKg > 0 ? qtdKg : undefined,
+      validade: validadeISO,
+      lotes: [novoLote],
+      codigoBarras: p.codigoBarras?.trim() || undefined,
+    };
+
+    const docRef = doc(collection(db, "produtos"));
+    batch.set(docRef, novoProduto);
+    sucesso++;
+  }
+
+  if (sucesso > 0) {
+    await batch.commit();
+  }
+
+  return { sucesso, erros };
 };

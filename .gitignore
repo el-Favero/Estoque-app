@@ -38,6 +38,10 @@ yarn-error.*
 
 app-example
 
+# Firebase local config
+src/firebaseConfig.local.ts
+src/firebaseConfig.local.js
+
 # generated native folders
 /ios
 /android
